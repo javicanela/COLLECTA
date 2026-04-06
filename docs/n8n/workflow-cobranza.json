@@ -1,0 +1,160 @@
+{
+  "name": "Cobranza - Automatizacion",
+  "active": false,
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "parameters": {}
+    },
+    {
+      "id": "2",
+      "name": "Parse Excel",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 4,
+      "position": [450, 300],
+      "parameters": {
+        "operation": "parseToJson",
+        "fileName": "={{ $json.fileName }}"
+      }
+    },
+    {
+      "id": "3",
+      "name": "Map Columnas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300],
+      "parameters": {
+        "jsCode": "const headers = $input.first().json.headers || [];\nconst rows = $input.first().json.data || [];\n\n// Mapeo básico de columnas comunes\nconst mapping = {\n  'RFC': 'rfc',\n  'rfc': 'rfc',\n  'RFC ': 'rfc',\n  'Nombre': 'nombre',\n  'nombre': 'nombre',\n  'Cliente': 'nombre',\n  'Monto': 'monto',\n  'monto': 'monto',\n  'Importe': 'monto',\n  'Cantidad': 'monto',\n  'Concepto': 'concepto',\n  'concepto': 'concepto',\n  'Tipo': 'concepto',\n  'Servicio': 'concepto',\n  'Fecha': 'fechaVence',\n  'fecha': 'fechaVence',\n  'Vencimiento': 'fechaVence',\n  'Telefono': 'telefono',\n  'telefono': 'telefono',\n  'Teléfono': 'telefono',\n  'Email': 'email',\n  'email': 'email',\n  'Correo': 'email'\n};\n\n// Mapear filas al formato requerido\nconst mappedRows = rows.map(row => {\n  const obj = {};\n  row.forEach((value, index) => {\n    const header = headers[index];\n    const mappedField = mapping[header];\n    if (mappedField && value !== undefined && value !== null && value !== '') {\n      obj[mappedField] = value;\n    }\n  });\n  // Convertir monto a número\n  if (obj.monto) {\n    obj.monto = typeof obj.monto === 'number' ? obj.monto : parseFloat(String(obj.monto).replace(/[$,]/g, '')) || 0;\n  }\n  return obj;\n}).filter(r => r.rfc); // Solo filas con RFC\n\nreturn { headers, rows: mappedRows };"
+      }
+    },
+    {
+      "id": "4",
+      "name": "Importar a Collecta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3001/api/import/batch",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "headers",
+              "value": "={{ $json.headers }}"
+            },
+            {
+              "name": "rows",
+              "value": "={{ $json.rows }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": []
+      }
+    },
+    {
+      "id": "5",
+      "name": "Loop Clientes",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1050, 300],
+      "parameters": {
+        "batchSize": 1
+      }
+    },
+    {
+      "id": "6",
+      "name": "Get Cliente por RFC",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 200],
+      "parameters": {
+        "method": "GET",
+        "url": "=http://localhost:3001/api/clients/by-rfc/{{ $json.rfc }}"
+      }
+    },
+    {
+      "id": "7",
+      "name": "Get Historial 3 meses",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 400],
+      "parameters": {
+        "method": "GET",
+        "url": "=http://localhost:3001/api/operations/cliente/{{ $json.rfc }}/historial?meses=3"
+      }
+    },
+    {
+      "id": "8",
+      "name": "Generar Mensaje WA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 300],
+      "parameters": {
+        "jsCode": "// Generar mensaje WhatsApp personalizado\nconst client = $('Get Cliente por RFC').first().json;\nconst operations = $('Get Historial 3 meses').first().json || [];\n\nconst pendientes = operations.filter(o => !o.fechaPago);\nconst pagados = operations.filter(o => o.fechaPago);\nconst totalPendiente = pendientes.reduce((sum, p) => sum + p.monto, 0);\nconst totalPagado = pagados.reduce((sum, p) => sum + p.monto, 0);\n\nconst conceptosList = pendientes.map((p, i) => \n  `${i + 1}. ${p.descripcion || p.tipo}: $${Number(p.monto).toLocaleString('es-MX')}`\n).join('\\n');\n\nconst config = {\n  nombre_despacho: 'Collecta',\n  beneficiario: 'BajaTax Services',\n  banco: 'BBVA',\n  clabe: '012345678901234567',\n  depto: 'Cobranzas',\n  tel: '6641234567'\n};\n\nconst mensaje = `*${config.nombre_despacho}* - Recordatorio de Pago\\n\\nEstimado *${client.nombre}*, le informamos que tiene los siguiente conceptos pendientes:\\n\\n${conceptosList}\\n\\n*TOTAL PENDIENTE: $${totalPendiente.toLocaleString('es-MX', {style: 'currency', currency: 'MXN'})}*\\n\\nPara realizar su pago:\\n- Beneficiario: ${config.beneficiario}\\n- Banco: ${config.banco}\\n- CLABE: ${config.clabe}\\n\\nHistorial de pagos (3 meses): $${totalPagado.toLocaleString('es-MX')}\\n\\n${config.depto} | ${config.tel}`;\n\nconst telefono = client.telefono?.replace(/\\D/g, '') || '';\nconst waUrl = telefono ? `https://wa.me/52${telefono}?text=${encodeURIComponent(mensaje)}` : null;\n\nreturn {\n  mensaje,\n  waUrl,\n  telefono,\n  cliente: client.nombre,\n  rfc: client.rfc,\n  totalPendiente,\n  totalPagado,\n  pendientesCount: pendientes.length\n};"
+      }
+    },
+    {
+      "id": "9",
+      "name": "Preview Mensaje",
+      "type": "n8n-nodes-base.notify",
+      "typeVersion": 1,
+      "position": [1650, 300],
+      "parameters": {
+        "title": "=Cliente: {{ $json.cliente }} ({{ $json.rfc }})",
+        "message": "={{ $json.mensaje }}"
+      }
+    },
+    {
+      "id": "10",
+      "name": "Abrir WhatsApp",
+      "type": "n8n-nodes-base.openUrl",
+      "typeVersion": 1,
+      "position": [1850, 300],
+      "parameters": {
+        "url": "={{ $json.waUrl }}"
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{"node": "Parse Excel", "type": "main", "index": 0}]]
+    },
+    "Parse Excel": {
+      "main": [[{"node": "Map Columnas", "type": "main", "index": 0}]]
+    },
+    "Map Columnas": {
+      "main": [[{"node": "Importar a Collecta", "type": "main", "index": 0}]]
+    },
+    "Importar a Collecta": {
+      "main": [[{"node": "Loop Clientes", "type": "main", "index": 0}]]
+    },
+    "Loop Clientes": {
+      "main": [
+        [{"node": "Get Cliente por RFC", "type": "main", "index": 0}],
+        [{"node": "Loop Clientes", "type": "main", "index": 0}]
+      ],
+      "metadata": [
+        {"rfc": "={{ $json.rfc }}"}
+      ]
+    },
+    "Get Cliente por RFC": {
+      "main": [[{"node": "Get Historial 3 meses", "type": "main", "index": 0}]]
+    },
+    "Get Historial 3 meses": {
+      "main": [[{"node": "Generar Mensaje WA", "type": "main", "index": 0}]]
+    },
+    "Generar Mensaje WA": {
+      "main": [[{"node": "Preview Mensaje", "type": "main", "index": 0}]]
+    },
+    "Preview Mensaje": {
+      "main": [[{"node": "Abrir WhatsApp", "type": "main", "index": 0}]]
+    }
+  }
+}

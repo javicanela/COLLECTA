@@ -1,0 +1,378 @@
+{
+  "_meta": {
+    "version": "2.0",
+    "descripcion": "Diccionario de alias para motor de importación inteligente BajaTax",
+    "fuentes": ["Contalink", "CONTPAQi", "Aspel COI/SAE/NOI", "SAT Buzón Tributario", "Banorte", "BBVA", "Inbursa", "Santander", "HSBC", "Banamex"],
+    "nota": "Todos los valores se normalizan: minúsculas, sin acentos, sin espacios antes de comparar"
+  },
+
+  "rfc": {
+    "_campo_destino": "rfc",
+    "_descripcion": "Registro Federal de Contribuyentes — 12 dígitos (moral) o 13 (física)",
+    "_validacion": "^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{2,3}$",
+    "alias_exactos": [
+      "RFC", "R.F.C.", "R.F.C", "RFC.", "r.f.c", "rfc.",
+      "CLAVE RFC", "CLAVE_RFC", "ClaveRFC",
+      "REGISTRO FEDERAL", "Registro Federal de Contribuyentes",
+      "CONTRIBUYENTE RFC", "RFC CONTRIBUYENTE",
+      "RFC_CLIENTE", "RFC_PROVEEDOR", "RFC CLIENTE",
+      "identificador fiscal", "ID FISCAL", "clave fiscal",
+      "RFC Receptor", "RFC Emisor", "RFC del Contribuyente"
+    ],
+    "alias_parciales": [
+      "rfc", "r.f.c", "registrofederal", "clavefiscal", "idfiscal",
+      "rfccliente", "rfcemisor", "rfcreceptor", "rfccontribuyente"
+    ],
+    "por_sistema": {
+      "Contalink": ["RFC", "RFC Cliente", "rfc_cliente"],
+      "CONTPAQi": ["RFC", "Clave RFC", "CLVRFC"],
+      "Aspel_COI": ["RFC", "RFC_CF", "RFCCF"],
+      "Aspel_SAE": ["RFC", "RFC_CLIE", "RFCCLIE"],
+      "SAT_buzon": ["RFC Receptor", "RfcReceptor", "RFC del Receptor"],
+      "SAT_facturas": ["RfcEmisor", "RfcReceptor"],
+      "BBVA": ["RFC"],
+      "Banorte": ["R.F.C."],
+      "Inbursa": ["RFC del Cliente"]
+    }
+  },
+
+  "nombre": {
+    "_campo_destino": "nombre",
+    "_descripcion": "Nombre completo o razón social del cliente/contribuyente",
+    "alias_exactos": [
+      "NOMBRE", "Nombre", "NOMBRE CLIENTE", "Nombre del Cliente",
+      "RAZÓN SOCIAL", "RAZON SOCIAL", "Razón Social", "Razon Social",
+      "NOMBRE O RAZÓN SOCIAL", "NOMBRE/RAZÓN SOCIAL",
+      "CONTRIBUYENTE", "Contribuyente", "NOMBRE CONTRIBUYENTE",
+      "CLIENTE", "Cliente", "NOMBRE_CLIENTE", "NombreCliente",
+      "EMPRESA", "Empresa", "NOMBRE EMPRESA",
+      "PERSONA", "DENOMINACION", "Denominación",
+      "DENOMINACION SOCIAL", "Denominación Social",
+      "Receptor", "RECEPTOR", "Nombre del Receptor",
+      "NOMBRE COMPLETO", "NombreCompleto", "Nombre Completo"
+    ],
+    "alias_parciales": [
+      "nombre", "razonsocial", "cliente", "contribuyente", "empresa",
+      "denominacion", "receptor", "nombrecompleto", "nombrecliente"
+    ],
+    "por_sistema": {
+      "Contalink": ["Nombre", "Nombre Cliente", "nombre_cliente"],
+      "CONTPAQi": ["Nombre", "Razón Social", "NOMCLIE"],
+      "Aspel_COI": ["Nombre", "NOMCF"],
+      "Aspel_SAE": ["Nombre", "NOM_CLIE"],
+      "SAT_buzon": ["Nombre Receptor", "NombreReceptor"],
+      "SAT_facturas": ["NombreEmisor", "NombreReceptor"],
+      "BBVA": ["NOMBRE", "Nombre del Cuentahabiente"],
+      "Banorte": ["NOMBRE", "Nombre"],
+      "Inbursa": ["Nombre del Cliente", "Razón Social"]
+    }
+  },
+
+  "monto": {
+    "_campo_destino": "monto",
+    "_descripcion": "Importe o cantidad monetaria en pesos MXN. Siempre positivo.",
+    "_validacion": "Número > 0, puede tener símbolo $ y comas",
+    "alias_exactos": [
+      "MONTO", "Monto", "IMPORTE", "Importe",
+      "TOTAL", "Total", "TOTAL MXN", "IMPORTE TOTAL",
+      "HONORARIOS", "Honorarios", "HONORARIOS MXN",
+      "CANTIDAD", "Cantidad", "MONTO TOTAL", "Monto Total",
+      "COBRO", "Cobro", "PAGO", "Pago",
+      "SALDO", "Saldo", "SALDO PENDIENTE", "Saldo Pendiente",
+      "ADEUDO", "Adeudo", "DEUDA", "Monto Adeudo",
+      "MONTO BASE", "MontoBase", "Monto Base",
+      "MONTO_TOTAL", "IMPORTE_TOTAL",
+      "VALOR", "Valor", "VALOR TOTAL",
+      "FACTURA MONTO", "Monto Factura",
+      "SUBTOTAL", "SubTotal",
+      "MENSUALIDAD", "Mensualidad",
+      "CUOTA", "Cuota"
+    ],
+    "alias_parciales": [
+      "monto", "importe", "total", "honorario", "cantidad", "cobro",
+      "saldo", "adeudo", "deuda", "valor", "cuota", "mensualidad", "subtotal"
+    ],
+    "por_sistema": {
+      "Contalink": ["Monto", "Importe", "Total", "Honorarios"],
+      "CONTPAQi": ["Importe", "Total", "IMPORTE", "Monto"],
+      "Aspel_COI": ["Importe", "IMPORTE", "Monto"],
+      "Aspel_SAE": ["Importe", "Precio", "Total"],
+      "SAT_buzon": ["Total", "SubTotal", "Importe"],
+      "SAT_facturas": ["Total", "SubTotal"],
+      "BBVA": ["Importe", "Monto", "Cargo", "Abono"],
+      "Banorte": ["MONTO", "Importe", "Cargo"],
+      "Inbursa": ["Monto", "Importe"]
+    }
+  },
+
+  "fecha": {
+    "_campo_destino": "fecha",
+    "_descripcion": "Fecha de la operación, emisión o cobro. Formato preferido: DD/MM/YYYY",
+    "_validacion": "Acepta DD/MM/YYYY, YYYY-MM-DD, DD-MM-YYYY, serial Excel (número > 40000)",
+    "alias_exactos": [
+      "FECHA", "Fecha", "FECHA COBRO", "Fecha de Cobro",
+      "FECHA EMISION", "FECHA EMISIÓN", "Fecha Emisión", "Fecha de Emisión",
+      "FECHA FACTURA", "Fecha Factura", "Fecha de Factura",
+      "FECHA OPERACION", "Fecha Operación", "Fecha de Operación",
+      "FECHA REGISTRO", "Fecha Registro",
+      "FECHA SERVICIO", "Fecha del Servicio",
+      "FECHA INICIO", "Fecha Inicio",
+      "FECHA GENERACION", "Fecha Generación",
+      "PERIODO", "Periodo",
+      "FECHA_COBRO", "FECHA_EMISION",
+      "Fecha Timbrado", "FECHA TIMBRADO"
+    ],
+    "alias_parciales": [
+      "fecha", "emision", "factura", "operacion", "registro",
+      "servicio", "inicio", "periodo", "timbrado", "generacion"
+    ],
+    "por_sistema": {
+      "Contalink": ["Fecha", "Fecha Cobro", "Fecha Emisión"],
+      "CONTPAQi": ["Fecha", "Fecha Póliza", "FechaDoc"],
+      "Aspel_COI": ["Fecha", "FECHA"],
+      "Aspel_SAE": ["Fecha", "FechaDoc", "FechaVta"],
+      "SAT_buzon": ["Fecha", "FechaTimbrado", "Fecha Timbrado"],
+      "SAT_facturas": ["Fecha", "FechaHora"],
+      "BBVA": ["FECHA", "Fecha Operación", "Fecha Aplicación"],
+      "Banorte": ["FECHA", "Fecha"],
+      "Inbursa": ["Fecha", "Fecha Valor"]
+    }
+  },
+
+  "vencimiento": {
+    "_campo_destino": "vencimiento",
+    "_descripcion": "Fecha límite de pago. Si está vacío, se calcula como fecha + 30 días.",
+    "alias_exactos": [
+      "VENCIMIENTO", "Vencimiento", "FECHA VENCIMIENTO", "Fecha de Vencimiento",
+      "FECHA LIMITE", "Fecha Límite", "FECHA LÍMITE",
+      "VIGENCIA", "Vigencia",
+      "FECHA PAGO", "Fecha de Pago", "FECHA DE PAGO",
+      "EXPIRACION", "Expiración", "FECHA EXPIRACION",
+      "LIMITE PAGO", "Límite de Pago",
+      "DUE DATE", "FECHA_VENCIMIENTO",
+      "PLAZO", "Plazo",
+      "FECHA COMPROMISO", "Fecha Compromiso"
+    ],
+    "alias_parciales": [
+      "vencimiento", "limite", "vigencia", "pago", "expiracion",
+      "plazo", "compromiso", "duedate"
+    ],
+    "por_sistema": {
+      "Contalink": ["Vencimiento", "Fecha Vencimiento", "Fecha Límite"],
+      "CONTPAQi": ["Vencimiento", "Fecha Vencimiento"],
+      "Aspel_SAE": ["FechaVenc", "Vencimiento"],
+      "SAT_buzon": ["FechaVencimiento"]
+    }
+  },
+
+  "concepto": {
+    "_campo_destino": "concepto",
+    "_descripcion": "Descripción del servicio o producto facturado.",
+    "alias_exactos": [
+      "CONCEPTO", "Concepto", "DESCRIPCION", "Descripción",
+      "SERVICIO", "Servicio", "DESCRIPCIÓN SERVICIO",
+      "DESCRIPCION SERVICIO", "Descripción del Servicio",
+      "PRODUCTO", "Producto",
+      "COMENTARIOS", "Comentarios",
+      "DESCRIPCION OPERACION", "Descripción Operación",
+      "DETALLE", "Detalle",
+      "OBSERVACIONES", "Observaciones",
+      "CONCEPTO COBRO", "Concepto de Cobro",
+      "TIPO SERVICIO", "Tipo de Servicio",
+      "DESCRIPCION_SERVICIO",
+      "UsoCFDI", "Uso CFDI"
+    ],
+    "alias_parciales": [
+      "concepto", "descripcion", "servicio", "producto", "comentario",
+      "detalle", "observacion", "tipo"
+    ],
+    "por_sistema": {
+      "Contalink": ["Concepto", "Descripción", "Servicio"],
+      "CONTPAQi": ["Concepto", "Descripción"],
+      "Aspel_COI": ["Concepto", "CONCEPTO"],
+      "Aspel_SAE": ["Concepto", "Descripcion"],
+      "SAT_buzon": ["Descripcion", "UsoCFDI"]
+    }
+  },
+
+  "telefono": {
+    "_campo_destino": "telefono",
+    "_descripcion": "Teléfono a 10 dígitos para WhatsApp. Prefijo 52 para API.",
+    "_validacion": "10 dígitos después de remover guiones, paréntesis, espacios",
+    "alias_exactos": [
+      "TELEFONO", "Teléfono", "CELULAR", "Celular",
+      "MOVIL", "Móvil", "WHATSAPP", "WhatsApp",
+      "NUMERO", "Número", "TEL", "Tel",
+      "TELEFONO CELULAR", "Teléfono Celular",
+      "NUMERO CELULAR", "Número Celular",
+      "TELEFONO MOVIL", "Teléfono Móvil",
+      "CONTACTO", "Contacto",
+      "TELEFONO_CLIENTE", "NUM_TEL",
+      "LADA Y NUMERO", "NUMERO TELEFONICO"
+    ],
+    "alias_parciales": [
+      "telefono", "celular", "movil", "whatsapp", "tel", "contacto",
+      "numerocell", "numtel"
+    ],
+    "por_sistema": {
+      "Contalink": ["Teléfono", "Celular", "Tel"],
+      "CONTPAQi": ["Teléfono", "Celular", "TELEFONO"],
+      "Aspel_SAE": ["Telefono", "Celular"],
+      "BBVA": [],
+      "Banorte": []
+    }
+  },
+
+  "email": {
+    "_campo_destino": "email",
+    "_descripcion": "Correo electrónico del cliente.",
+    "_validacion": "Contiene @ y punto después del @",
+    "alias_exactos": [
+      "EMAIL", "Email", "CORREO", "Correo",
+      "CORREO ELECTRONICO", "Correo Electrónico",
+      "E-MAIL", "e-mail", "MAIL", "Mail",
+      "CORREO_ELECTRONICO", "CorreoElectronico",
+      "EMAIL CLIENTE", "Correo del Cliente",
+      "CONTACTO EMAIL", "EMAIL DE CONTACTO"
+    ],
+    "alias_parciales": [
+      "email", "correo", "mail", "electronico"
+    ],
+    "por_sistema": {
+      "Contalink": ["Email", "Correo", "Correo Electrónico"],
+      "CONTPAQi": ["Email", "Correo"],
+      "Aspel_SAE": ["Email", "Correo"]
+    }
+  },
+
+  "factura": {
+    "_campo_destino": "factura",
+    "_descripcion": "Número o folio de la factura / CFDI.",
+    "alias_exactos": [
+      "FACTURA", "Factura", "FOLIO", "Folio",
+      "NUMERO FACTURA", "Número de Factura", "No. Factura",
+      "FOLIO FISCAL", "Folio Fiscal",
+      "UUID", "UUID CFDI",
+      "CFDI", "FOLIO CFDI",
+      "ID FACTURA", "ID_FACTURA",
+      "SERIE FOLIO", "Serie-Folio",
+      "DOCUMENTO", "Documento",
+      "No.", "No. Doc", "Num Doc",
+      "REFERENCIA", "Referencia"
+    ],
+    "alias_parciales": [
+      "factura", "folio", "uuid", "cfdi", "documento", "referencia",
+      "foliofiscal", "numerofactura"
+    ],
+    "por_sistema": {
+      "Contalink": ["Folio", "UUID", "Factura"],
+      "CONTPAQi": ["Folio", "Serie", "Num Doc"],
+      "Aspel_COI": ["Folio", "FOLIO"],
+      "Aspel_SAE": ["Folio", "FolioDoc"],
+      "SAT_buzon": ["UUID", "Folio Fiscal", "FolioFiscal"],
+      "SAT_facturas": ["UUID", "FolioFiscal"]
+    }
+  },
+
+  "regimen": {
+    "_campo_destino": "regimen",
+    "_descripcion": "Régimen fiscal SAT del contribuyente.",
+    "alias_exactos": [
+      "REGIMEN", "Régimen", "REGIMEN FISCAL", "Régimen Fiscal",
+      "TIPO REGIMEN", "Tipo de Régimen", "TIPO CLIENTE",
+      "REGIMEN_FISCAL", "RegimenFiscal",
+      "CLAVE REGIMEN", "Clave Régimen",
+      "TIPO PERSONA", "Tipo de Persona",
+      "PERSONA FISICA", "PERSONA MORAL",
+      "PF", "PM", "PFAE"
+    ],
+    "alias_parciales": [
+      "regimen", "fiscal", "tipocliente", "tipopersona", "persona"
+    ],
+    "por_sistema": {
+      "Contalink": ["Régimen", "Régimen Fiscal"],
+      "CONTPAQi": ["Régimen Fiscal", "Tipo Régimen"],
+      "SAT_buzon": ["RegimenFiscal", "Régimen Fiscal"]
+    },
+    "valores_conocidos": {
+      "601": "General de Ley Personas Morales",
+      "603": "Personas Morales con Fines no Lucrativos",
+      "605": "Sueldos y Salarios e Ingresos Asimilados",
+      "606": "Arrendamiento",
+      "607": "Régimen de Enajenación o Adquisición de Bienes",
+      "608": "Demás Ingresos",
+      "610": "Residentes en el Extranjero sin EP en México",
+      "611": "Ingresos por Dividendos",
+      "612": "Personas Físicas con Actividades Empresariales y Profesionales",
+      "614": "Ingresos por Intereses",
+      "616": "Sin Obligaciones Fiscales",
+      "620": "Sociedades Cooperativas de Producción",
+      "621": "Incorporación Fiscal",
+      "622": "Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras",
+      "623": "Opcional para Grupos de Sociedades",
+      "624": "Coordinados",
+      "625": "Actividades Empresariales con Ingresos a través de Plataformas",
+      "626": "Simplificado de Confianza (RESICO)"
+    }
+  },
+
+  "responsable": {
+    "_campo_destino": "responsable",
+    "_descripcion": "Asesor o contador asignado al cliente.",
+    "alias_exactos": [
+      "RESPONSABLE", "Responsable", "ASESOR", "Asesor",
+      "ASIGNADO", "Asignado", "CONTADOR", "Contador",
+      "AGENTE", "Agente", "EJECUTIVO", "Ejecutivo",
+      "VENDEDOR", "Vendedor",
+      "ASESOR FISCAL", "Asesor Fiscal",
+      "ASESOR_ASIGNADO", "RESPONSABLE_CUENTA"
+    ],
+    "alias_parciales": [
+      "responsable", "asesor", "asignado", "contador", "agente", "ejecutivo"
+    ]
+  },
+
+  "clabe": {
+    "_campo_destino": "clabe",
+    "_descripcion": "CLABE interbancaria 18 dígitos. Solo en DIRECTORIO/CONFIGURACIÓN.",
+    "_validacion": "Exactamente 18 dígitos numéricos",
+    "alias_exactos": [
+      "CLABE", "Clabe", "CLABE INTERBANCARIA", "Clabe Interbancaria",
+      "CLABE TRANSFERENCIA", "CUENTA CLABE",
+      "CLAVE INTERBANCARIA", "Clave Interbancaria"
+    ],
+    "alias_parciales": [
+      "clabe", "interbancaria"
+    ]
+  },
+
+  "estatus_pago": {
+    "_campo_destino": "estatus_pago",
+    "_descripcion": "Estado del pago. El sistema lo calcula automáticamente; solo importar si viene de un export previo de BajaTax.",
+    "alias_exactos": [
+      "ESTATUS", "Estatus", "STATUS", "Status",
+      "ESTADO PAGO", "Estado de Pago",
+      "ESTATUS PAGO", "Estatus de Pago",
+      "SITUACION", "Situación",
+      "ESTADO", "Estado"
+    ],
+    "valores_validos": ["PAGADO", "PENDIENTE", "VENCIDO", "HOY VENCE"],
+    "ignorar_si_vacio": true
+  },
+
+  "_campos_ignorar": {
+    "_descripcion": "Columnas que el sistema debe marcar automáticamente como 'ignorar'",
+    "alias": [
+      "consecutivo", "num", "No", "No.", "#", "ID", "id",
+      "indice", "índice", "fila", "row",
+      "notas internas", "comentarios internos",
+      "columna1", "columna2", "column1", "column2",
+      "sin nombre", "unnamed", "Unnamed",
+      "IVA", "IVA 16%", "iva",
+      "ISR RETENIDO", "ISR RET", "isr",
+      "IEPS",
+      "TIPO CAMBIO", "TC",
+      "MONEDA", "Moneda", "MXN", "USD"
+    ]
+  }
+}
