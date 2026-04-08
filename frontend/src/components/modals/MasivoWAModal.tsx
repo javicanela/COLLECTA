@@ -98,11 +98,6 @@ export default function MasivoWAModal({ isOpen, onClose, operations, config }: M
       });
   }, [operations, excludedKeys, modo, config]);
 
-  const _skippedSuspendidos = operations.filter(op => op.client?.estado === 'SUSPENDIDO').length;
-  const _skippedSinTel = operations.filter(op => {
-    if (op.client?.estado === 'SUSPENDIDO') return false;
-    return !op.client?.telefono;
-  }).length;
 
   const getTemplate = (tipo: PlantillaTipo) => {
     if (tipo === 'vencido') return config.plantilla_vencido || DEFAULT_MSG_VENCIDO;
