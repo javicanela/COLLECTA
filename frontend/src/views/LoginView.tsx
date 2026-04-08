@@ -3,8 +3,7 @@ import { motion } from 'framer-motion';
 import { Eye, EyeOff, Lock, Mail, AlertCircle } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { useAuthStore } from '../stores/useAuthStore';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+import { API_BASE_URL } from '../services/api';
 
 export default function LoginView() {
   const [email, setEmail] = useState('');
