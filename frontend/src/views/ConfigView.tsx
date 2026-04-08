@@ -13,7 +13,6 @@ import { pdf } from '@react-pdf/renderer';
 import EstadoCuentaPDF from '../pdf-templates/EstadoCuentaPDF';
 import { Input } from '../components/ui/Input';
 import { Textarea } from '../components/ui/Input';
-import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { PlantillaModal } from '../components/modals/PlantillaModal';

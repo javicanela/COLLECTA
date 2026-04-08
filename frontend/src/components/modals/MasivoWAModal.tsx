@@ -98,8 +98,8 @@ export default function MasivoWAModal({ isOpen, onClose, operations, config }: M
       });
   }, [operations, excludedKeys, modo, config]);
 
-  const skippedSuspendidos = operations.filter(op => op.client?.estado === 'SUSPENDIDO').length;
-  const skippedSinTel = operations.filter(op => {
+  const _skippedSuspendidos = operations.filter(op => op.client?.estado === 'SUSPENDIDO').length;
+  const _skippedSinTel = operations.filter(op => {
     if (op.client?.estado === 'SUSPENDIDO') return false;
     return !op.client?.telefono;
   }).length;
