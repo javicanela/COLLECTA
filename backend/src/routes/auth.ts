@@ -13,9 +13,20 @@ function isValidSecret(): boolean {
 }
 
 function isValidAdminCredentials(email: string, password: string): boolean {
-  if (!ADMIN_USER || !ADMIN_PASS) return false;
+  if (!ADMIN_USER || !ADMIN_PASS) {
+    console.log('[DEBUG] ADMIN_USER or ADMIN_PASS is undefined', { ADMIN_USER, ADMIN_PASS: ADMIN_PASS ? 'SET' : 'UNDEFINED' });
+    return false;
+  }
   const emailMatch = email.toLowerCase() === ADMIN_USER.toLowerCase() ||
                      email.toLowerCase() === `${ADMIN_USER}@collecta.local`.toLowerCase();
+  console.log('[DEBUG] Credential check:', { 
+    emailMatch, 
+    passwordMatch: password === ADMIN_PASS,
+    passwordLength: password.length,
+    adminPassLength: ADMIN_PASS.length,
+    passwordCharCodes: [...password].map(c => c.charCodeAt(0)),
+    adminPassCharCodes: [...ADMIN_PASS].map(c => c.charCodeAt(0))
+  });
   return emailMatch && password === ADMIN_PASS;
 }
 
