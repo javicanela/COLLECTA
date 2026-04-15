@@ -13,6 +13,7 @@ import extractRoutes from './routes/extract';
 import logsRoutes from './routes/import';
 import importRoutes from './routes/import';
 import cobranzaRoutes from './routes/cobranza';
+import n8nRoutes from './routes/n8n';
 
 dotenv.config();
 
@@ -30,6 +31,7 @@ const globalLimiter = rateLimit({
   limit: isProduction ? 100 : 9999,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: { error: 'Demasiadas peticiones, intente más tarde' },
 });
 app.use(globalLimiter);
@@ -40,6 +42,7 @@ const extractLimiter = rateLimit({
   limit: isProduction ? 60 : 9999,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: { error: 'Límite de extracción AI excedido, intenta en unos minutos' },
 });
 
@@ -100,6 +103,7 @@ app.use('/api/extract', extractLimiter, extractRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/import', importRoutes);
 app.use('/api/cobranza', cobranzaRoutes);
+app.use('/api/n8n', n8nRoutes);
 
 // Log all requests for debugging
 app.use((req, _res, next) => {
