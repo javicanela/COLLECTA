@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { Eye, EyeOff, Lock, Mail, AlertCircle } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { useAuthStore } from '../stores/useAuthStore';
-import { API_BASE_URL } from '../services/api';
 
 export default function LoginView() {
   const [email, setEmail] = useState('');
@@ -19,20 +18,10 @@ export default function LoginView() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al iniciar sesión');
+      const success = await login(email, password);
+      if (!success) {
+        throw new Error('Credenciales inválidas');
       }
-
-      localStorage.setItem('collecta-token', data.token);
-      login(email, password);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error de conexión');
     } finally {
