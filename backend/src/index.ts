@@ -10,10 +10,13 @@ import clientRoutes from './routes/clients';
 import operationRoutes from './routes/operations';
 import configRoutes from './routes/config';
 import extractRoutes from './routes/extract';
-import logsRoutes from './routes/import';
+import logsRoutes from './routes/logs';
 import importRoutes from './routes/import';
 import cobranzaRoutes from './routes/cobranza';
 import n8nRoutes from './routes/n8n';
+import whatsappRoutes from './routes/whatsapp';
+import webhookRoutes from './routes/webhooks';
+import { requireAuth } from './middleware/auth';
 
 dotenv.config();
 
@@ -94,24 +97,18 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
-// Routes - auth endpoints don't require auth (obviously)
+// Routes - auth endpoints don't require auth
 app.use('/api/auth', authRoutes);
-app.use('/api/clients', clientRoutes);
-app.use('/api/operations', operationRoutes);
-app.use('/api/config', configRoutes);
-app.use('/api/extract', extractLimiter, extractRoutes);
-app.use('/api/logs', logsRoutes);
-app.use('/api/import', importRoutes);
-app.use('/api/cobranza', cobranzaRoutes);
-app.use('/api/n8n', n8nRoutes);
-
-// Log all requests for debugging
-app.use((req, _res, next) => {
-  if (req.method === 'DELETE' || req.method === 'PUT') {
-    console.log(`[ROUTER] ${req.method} request to: ${req.path}, body:`, req.body);
-  }
-  next();
-});
+app.use('/api/clients', requireAuth, clientRoutes);
+app.use('/api/operations', requireAuth, operationRoutes);
+app.use('/api/config', requireAuth, configRoutes);
+app.use('/api/extract', extractLimiter, requireAuth, extractRoutes);
+app.use('/api/logs', requireAuth, logsRoutes);
+app.use('/api/import', requireAuth, importRoutes);
+app.use('/api/cobranza', requireAuth, cobranzaRoutes);
+app.use('/api/n8n', requireAuth, n8nRoutes);
+app.use('/api/whatsapp', requireAuth, whatsappRoutes);
+app.use('/api/webhooks', webhookRoutes); // Uses its own auth (X-Webhook-Secret)
 
 // Error handler - don't expose error messages in production
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

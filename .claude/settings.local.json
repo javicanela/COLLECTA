@@ -90,7 +90,21 @@
       "Bash(powershell -Command \"Stop-Process -Id 24672 -Force\")",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('OK - nombre:', d.get\\('nombre'\\), '| telefono:', d.get\\('telefono'\\)\\)\")",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d[0]['id'] if d else 'EMPTY'\\)\")",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d[0]['id']\\)\")"
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d[0]['id']\\)\")",
+      "Bash(./node_modules/.bin/prisma migrate:*)",
+      "Bash(node_modules/.bin/prisma migrate:*)",
+      "Bash(npx skills:*)",
+      "mcp__plugin_vercel-plugin_vercel__list_teams",
+      "mcp__plugin_vercel-plugin_vercel__list_projects",
+      "mcp__plugin_vercel-plugin_vercel__get_project",
+      "Bash(npx -y @neondatabase/mcp-server-neon --version)",
+      "Bash(npx -y @railway/mcp --version)",
+      "Bash(wait)",
+      "Bash(npm search:*)",
+      "Bash(cat /c/Users/LENOVO/.claude/session-env/vercel* ls /c/Users/LENOVO/.claude/plugins/)",
+      "Bash(/c/Users/LENOVO/AppData/Roaming/npm/tsc.cmd -b --noEmit)",
+      "mcp__plugin_vercel-plugin_vercel__list_deployments",
+      "Bash(node_modules/.bin/tsc --noEmit)"
     ]
   }
 }

@@ -18,37 +18,39 @@ model User {
 }
 
 model Client {
-  id           String      @id @default(cuid())
-  rfc          String      @unique
-  nombre       String
-  telefono     String?
-  email        String?
-  regimen      String?
-  categoria    String?
-  asesor       String?
-  estado       String      @default("ACTIVO")
-  notas        String?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  operations   Operation[]
-  logEntries   LogEntry[]
+  id               String            @id @default(cuid())
+  rfc              String            @unique
+  nombre           String
+  telefono         String?
+  email            String?
+  regimen          String?
+  categoria        String?
+  asesor           String?
+  estado           String            @default("ACTIVO")
+  notas            String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  operations       Operation[]
+  logEntries       LogEntry[]
+  whatsAppMessages WhatsAppMessage[]
 }
 
 model Operation {
-  id           String   @id @default(cuid())
-  clientId     String
-  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  tipo         String
-  descripcion  String?
-  monto        Float    @default(0)
-  fechaVence   DateTime
-  fechaPago    DateTime?
-  estatus      String   @default("PENDIENTE")
-  asesor       String?
-  excluir      Boolean  @default(false)
-  archived     Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id               String            @id @default(cuid())
+  clientId         String
+  client           Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tipo             String
+  descripcion      String?
+  monto            Float             @default(0)
+  fechaVence       DateTime
+  fechaPago        DateTime?
+  estatus          String            @default("PENDIENTE")
+  asesor           String?
+  excluir          Boolean           @default(false)
+  archived         Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  whatsAppMessages WhatsAppMessage[]
 }
 
 model LogEntry {
@@ -67,4 +69,20 @@ model LogEntry {
 model Config {
   key   String @id
   value String
+}
+
+model WhatsAppMessage {
+  id             String     @id @default(cuid())
+  operationId    String?
+  operation      Operation? @relation(fields: [operationId], references: [id], onDelete: SetNull)
+  clientId       String?
+  client         Client?    @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  direction      String     // "OUTGOING" | "INCOMING"
+  messageType    String     // "TEXT" | "IMAGE" | "DOCUMENT"
+  phone          String
+  content        String?
+  mediaUrl       String?
+  evolutionMsgId String?
+  status         String     @default("SENT")
+  createdAt      DateTime   @default(now())
 }

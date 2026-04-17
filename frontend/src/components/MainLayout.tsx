@@ -38,6 +38,7 @@ export default function MainLayout() {
 
   const [activeProvider, setActiveProvider] = useState<string | null>(null);
   const [sysMode, setSysMode] = useState<string>('PRUEBA');
+  const [waStatus, setWaStatus] = useState<'connected' | 'disconnected' | 'not_configured'>('not_configured');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -56,14 +57,26 @@ export default function MainLayout() {
       setSysMode(modo);
       localStorage.setItem('sys_modo', modo);
     }).catch(() => {});
-    
+
+    // Poll WhatsApp connection status
+    const pollWaStatus = () => {
+      api.get<{ configured: boolean; connected: boolean }>('/whatsapp/status')
+        .then(s => setWaStatus(s.configured ? (s.connected ? 'connected' : 'disconnected') : 'not_configured'))
+        .catch(() => setWaStatus('not_configured'));
+    };
+    pollWaStatus();
+    const waInterval = setInterval(pollWaStatus, 30000);
+
     const handleModoChange = (e: Event) => {
       const customEvent = e as CustomEvent;
       setSysMode(customEvent.detail || 'PRUEBA');
       localStorage.setItem('sys_modo', customEvent.detail || 'PRUEBA');
     };
     window.addEventListener('modo-changed', handleModoChange);
-    return () => window.removeEventListener('modo-changed', handleModoChange);
+    return () => {
+      clearInterval(waInterval);
+      window.removeEventListener('modo-changed', handleModoChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -297,7 +310,7 @@ export default function MainLayout() {
               </span>
             </div>
 
-            <div className="flex items-center gap-2 px-4 py-2 text-white/50 text-xs font-medium mb-3">
+            <div className="flex items-center gap-2 px-4 py-2 text-white/50 text-xs font-medium">
               {activeProvider ? (
                 <>
                   <Zap size={14} style={{ color: '#10B77D' }} />
@@ -309,6 +322,19 @@ export default function MainLayout() {
                   <span>Sin API</span>
                 </>
               )}
+            </div>
+
+            <div className="flex items-center gap-2 px-4 py-2 text-white/50 text-xs font-medium mb-3">
+              <span
+                className="w-2 h-2 rounded-full flex-shrink-0"
+                style={{
+                  background: waStatus === 'connected' ? '#25D366' : waStatus === 'disconnected' ? '#EF3F3F' : '#6B7280',
+                  boxShadow: waStatus === 'connected' ? '0 0 6px #25D366' : 'none',
+                }}
+              />
+              <span>
+                WA {waStatus === 'connected' ? 'Conectado' : waStatus === 'disconnected' ? 'Desconectado' : 'No config.'}
+              </span>
             </div>
 
             <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent my-3" />

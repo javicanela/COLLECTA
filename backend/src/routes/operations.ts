@@ -4,13 +4,6 @@ import { z } from 'zod';
 
 const router = Router();
 
-router.use((req, _res, next) => {
-  if (req.method === 'DELETE') {
-    console.log(`[operations.ts] DELETE received: ${req.path}, params:`, req.params);
-  }
-  next();
-});
-
 const operationCreateSchema = z.object({
   clientId: z.string().min(1, 'clientId requerido'),
   tipo: z.string().min(1, 'tipo requerido'),
