@@ -8,6 +8,10 @@ const ADMIN_USER = process.env.ADMIN_USER;
 const ADMIN_PASS = process.env.ADMIN_PASS;
 const TOKEN_EXPIRY = '24h';
 
+console.log('[AUTH] JWT_SECRET:', JWT_SECRET ? 'SET' : 'UNSET');
+console.log('[AUTH] ADMIN_USER:', ADMIN_USER);
+console.log('[AUTH] ADMIN_PASS:', ADMIN_PASS);
+
 function isValidSecret(): boolean {
   return !!(JWT_SECRET && JWT_SECRET.length >= 32);
 }
