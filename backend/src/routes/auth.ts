@@ -50,7 +50,9 @@ router.post('/login', (req: Request, res: Response) => {
   };
 
   try {
+    console.log('[LOGIN] Attempting to sign JWT with payload:', payload);
     const token = jwt.sign(payload, JWT_SECRET as string, { expiresIn: TOKEN_EXPIRY });
+    console.log('[LOGIN] JWT signed successfully');
 
     res.json({
       token,
@@ -62,6 +64,7 @@ router.post('/login', (req: Request, res: Response) => {
       },
     });
   } catch (err) {
+    console.log('[LOGIN] Error generating token:', err);
     res.status(500).json({ error: 'Error generando token' });
   }
 });
