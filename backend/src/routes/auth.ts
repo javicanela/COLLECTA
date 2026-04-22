@@ -105,4 +105,22 @@ router.post('/verify', (req: Request, res: Response) => {
   }
 });
 
+router.post('/debug', (req: Request, res: Response) => {
+  const { email, password } = req.body || {};
+  const ADMIN_USER_LOWER = ADMIN_USER?.toLowerCase() || 'UNSET';
+  const ADMIN_PASS_VAL = ADMIN_PASS || 'UNSET';
+  const emailInputLower = (email || '').toLowerCase();
+  const emailMatch = emailInputLower === ADMIN_USER_LOWER ||
+    emailInputLower === `${ADMIN_USER_LOWER}@collecta.local`;
+  res.json({
+    env_ADMIN_USER: ADMIN_USER,
+    env_ADMIN_PASS: ADMIN_PASS ? `[SET:${ADMIN_PASS.length} chars]` : 'UNSET',
+    input_EMAIL: email,
+    input_PASS: password ? `[SET:${password.length} chars]` : 'UNSET',
+    emailMatch,
+    passwordMatch: password === ADMIN_PASS,
+    allValid: isValidAdminCredentials(email || '', password || ''),
+  });
+});
+
 export default router;
