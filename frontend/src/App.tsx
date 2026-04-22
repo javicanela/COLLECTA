@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { AnimatePresence, motion } from 'framer-motion';
 import ErrorBoundary from './components/ErrorBoundary';
 import MainLayout from './components/MainLayout';
-import LoginModal from './components/LoginModal';
+import LoginView from './views/LoginView';
 import DashboardView from './views/DashboardView';
 import DirectoryView from './views/DirectoryView';
 import RegistersView from './views/RegistersView';
@@ -79,8 +79,7 @@ function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
-        {!isAuthenticated && <LoginModal />}
-        <AppRoutes />
+        {isAuthenticated ? <AppRoutes /> : <LoginView />}
       </BrowserRouter>
     </ErrorBoundary>
   );

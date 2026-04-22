@@ -44,6 +44,7 @@ export const authService = {
 
   async verify(token: string): Promise<VerifyResponse> {
     return request<VerifyResponse>('/auth/verify', {
+      method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
   },
