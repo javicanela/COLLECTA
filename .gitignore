@@ -41,3 +41,14 @@ backend/data/reports/
 # Test artifacts
 test-screenshots/
 coverage/
+
+# Playwright MCP artifacts (session logs + snapshots)
+.playwright-mcp/
+
+# External reference clones (not part of Collecta)
+n8n/templates/
+
+# Root-level debug/test scripts and screenshots
+test-*.js
+debug-*.js
+/*.png
