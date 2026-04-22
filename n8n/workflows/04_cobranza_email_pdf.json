@@ -1,0 +1,264 @@
+{
+  "name": "Collecta — Cobranza por Email con PDF adjunto",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 10,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "cron-email",
+      "name": "⏰ Cada día 10:00 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.COLLECTA_API_URL || 'http://localhost:3001'}}/api/n8n/pending-collections",
+        "authentication": "none",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "http-pending-email",
+      "name": "📋 Obtener Pendientes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-total",
+              "leftValue": "={{ $json.total }}",
+              "rightValue": "0",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-has-pending-email",
+      "name": "🔍 ¿Hay pendientes?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "collections",
+        "options": {}
+      },
+      "id": "split-collections-email",
+      "name": "📤 Separar operaciones",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-email",
+              "leftValue": "={{ $json.clienteEmail }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            },
+            {
+              "id": "check-vencido",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "AL_CORRIENTE",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-has-email",
+      "name": "📧 ¿Tiene email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.COLLECTA_API_URL || 'http://localhost:3001'}}/api/cobranza/cliente/{{ $json.clienteRfc }}/pdf",
+        "authentication": "none",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 20000
+        }
+      },
+      "id": "get-pdf",
+      "name": "📄 Generar PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 120]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('📤 Separar operaciones').item.json.clienteEmail }}",
+        "subject": "=Estado de Cuenta - {{ $('📤 Separar operaciones').item.json.tipo }} | {{ $('📤 Separar operaciones').item.json.clienteNombre }}",
+        "emailType": "html",
+        "html": "=<div style=\"font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f8fafc;\">\n  <div style=\"background: #0c2340; padding: 24px; text-align: center;\">\n    <h1 style=\"color: #fff; margin: 0; font-size: 22px;\">Estado de Cuenta</h1>\n    <p style=\"color: #93c5fd; margin: 4px 0 0;\">{{ $('📤 Separar operaciones').item.json.clienteNombre }}</p>\n  </div>\n  \n  <div style=\"padding: 24px;\">\n    <div style=\"background: {{ $('📤 Separar operaciones').item.json.status === 'VENCIDO' ? '#fef2f2' : '#fef9c3' }}; border-left: 4px solid {{ $('📤 Separar operaciones').item.json.status === 'VENCIDO' ? '#ef4444' : '#f59e0b' }}; padding: 16px; margin-bottom: 20px; border-radius: 4px;\">\n      <p style=\"margin: 0; font-weight: 600; color: #1e293b;\">{{ $('📤 Separar operaciones').item.json.status === 'VENCIDO' ? '⚠️ Pago vencido' : '📅 Próximo vencimiento' }}</p>\n      <p style=\"margin: 8px 0 0; color: #475569;\">{{ $('📤 Separar operaciones').item.json.tipo }} — {{ $('📤 Separar operaciones').item.json.montoFormateado }}</p>\n    </div>\n    \n    <table style=\"width: 100%; border-collapse: collapse; margin-bottom: 20px;\">\n      <tr style=\"border-bottom: 1px solid #e2e8f0;\">\n        <td style=\"padding: 8px 0; color: #64748b;\">Concepto:</td>\n        <td style=\"padding: 8px 0; font-weight: 600;\">{{ $('📤 Separar operaciones').item.json.descripcion || $('📤 Separar operaciones').item.json.tipo }}</td>\n      </tr>\n      <tr style=\"border-bottom: 1px solid #e2e8f0;\">\n        <td style=\"padding: 8px 0; color: #64748b;\">Monto:</td>\n        <td style=\"padding: 8px 0; font-weight: 600; color: #e03535;\">{{ $('📤 Separar operaciones').item.json.montoFormateado }}</td>\n      </tr>\n      <tr style=\"border-bottom: 1px solid #e2e8f0;\">\n        <td style=\"padding: 8px 0; color: #64748b;\">RFC:</td>\n        <td style=\"padding: 8px 0; font-family: monospace;\">{{ $('📤 Separar operaciones').item.json.clienteRfc }}</td>\n      </tr>\n    </table>\n    \n    <p style=\"color: #475569; font-size: 14px;\">Adjuntamos su estado de cuenta detallado en formato PDF.</p>\n    <p style=\"color: #475569; font-size: 14px;\">Para cualquier aclaración, contáctenos.</p>\n  </div>\n  \n  <div style=\"background: #0c2340; padding: 16px; text-align: center; color: #93c5fd; font-size: 12px;\">\n    <p style=\"margin: 0;\">Este es un mensaje automático generado por el sistema de cobranza.</p>\n  </div>\n</div>",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "binaryPropertyName": "data"
+              }
+            ]
+          }
+        }
+      },
+      "id": "send-email",
+      "name": "📧 Enviar Email + PDF",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1540, 120],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "CONFIGURE_YOUR_GMAIL_CREDENTIALS",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "id": "wait-email",
+      "name": "⏳ Esperar 3s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1760, 120]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.COLLECTA_API_URL || 'http://localhost:3001'}}/api/logs",
+        "authentication": "none",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"clientId\": \"{{ $('📤 Separar operaciones').item.json.clientId }}\",\n  \"tipo\": \"EMAIL\",\n  \"variante\": \"{{ $('📤 Separar operaciones').item.json.status }}\",\n  \"resultado\": \"ENVIADO\",\n  \"mensaje\": \"Email con PDF adjunto enviado a {{ $('📤 Separar operaciones').item.json.clienteEmail }}\",\n  \"telefono\": \"\",\n  \"modo\": \"PRODUCCIÓN\"\n}",
+        "options": {}
+      },
+      "id": "log-email",
+      "name": "📝 Log envío Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1980, 120]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.COLLECTA_API_URL || 'http://localhost:3001'}}/api/logs",
+        "authentication": "none",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"clientId\": \"{{ $json.clientId }}\",\n  \"tipo\": \"EMAIL\",\n  \"variante\": \"{{ $json.status }}\",\n  \"resultado\": \"ERROR\",\n  \"mensaje\": \"Sin email registrado para {{ $json.clienteNombre }}\",\n  \"modo\": \"PRODUCCIÓN\"\n}",
+        "options": {}
+      },
+      "id": "log-no-email",
+      "name": "⚠️ Log sin email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 320]
+    },
+    {
+      "parameters": {},
+      "id": "noop-nothing",
+      "name": "✅ Nada que enviar",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [880, 420]
+    }
+  ],
+  "connections": {
+    "⏰ Cada día 10:00 AM": {
+      "main": [
+        [{ "node": "📋 Obtener Pendientes", "type": "main", "index": 0 }]
+      ]
+    },
+    "📋 Obtener Pendientes": {
+      "main": [
+        [{ "node": "🔍 ¿Hay pendientes?", "type": "main", "index": 0 }]
+      ]
+    },
+    "🔍 ¿Hay pendientes?": {
+      "main": [
+        [{ "node": "📤 Separar operaciones", "type": "main", "index": 0 }],
+        [{ "node": "✅ Nada que enviar", "type": "main", "index": 0 }]
+      ]
+    },
+    "📤 Separar operaciones": {
+      "main": [
+        [{ "node": "📧 ¿Tiene email?", "type": "main", "index": 0 }]
+      ]
+    },
+    "📧 ¿Tiene email?": {
+      "main": [
+        [{ "node": "📄 Generar PDF", "type": "main", "index": 0 }],
+        [{ "node": "⚠️ Log sin email", "type": "main", "index": 0 }]
+      ]
+    },
+    "📄 Generar PDF": {
+      "main": [
+        [{ "node": "📧 Enviar Email + PDF", "type": "main", "index": 0 }]
+      ]
+    },
+    "📧 Enviar Email + PDF": {
+      "main": [
+        [{ "node": "⏳ Esperar 3s", "type": "main", "index": 0 }]
+      ]
+    },
+    "⏳ Esperar 3s": {
+      "main": [
+        [{ "node": "📝 Log envío Email", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "collecta" },
+    { "name": "email" },
+    { "name": "cobranza" }
+  ],
+  "triggerCount": 1
+}

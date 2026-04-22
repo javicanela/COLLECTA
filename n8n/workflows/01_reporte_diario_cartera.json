@@ -1,0 +1,260 @@
+{
+  "name": "Collecta — Reporte Diario de Cartera",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "⏰ Cada día 8:00 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.COLLECTA_API_URL || 'http://localhost:3001'}}/api/n8n/daily-report",
+        "authentication": "none",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "http-daily-report",
+      "name": "📊 Obtener Reporte",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-vencidas",
+              "leftValue": "={{ $json.summary.vencidas }}",
+              "rightValue": "0",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "or"
+        }
+      },
+      "id": "if-has-urgents",
+      "name": "🔴 ¿Hay vencidas?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "msg-urgente",
+              "name": "mensaje",
+              "value": "={{ $json.mensajeFormateado }}\n\n🚨 *ALERTA: {{ $json.summary.vencidas }} operaciones vencidas requieren acción inmediata*",
+              "type": "string"
+            },
+            {
+              "id": "tipo-reporte",
+              "name": "tipoReporte",
+              "value": "URGENTE",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-urgente",
+      "name": "🚨 Reporte URGENTE",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "msg-normal",
+              "name": "mensaje",
+              "value": "={{ $json.mensajeFormateado }}\n\n✅ Sin operaciones vencidas. Cartera saludable.",
+              "type": "string"
+            },
+            {
+              "id": "tipo-reporte",
+              "name": "tipoReporte",
+              "value": "NORMAL",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "set-normal",
+      "name": "✅ Reporte Normal",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [880, 420]
+    },
+    {
+      "parameters": {
+        "url": "https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
+        "authentication": "none",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{$env.TELEGRAM_CHAT_ID}}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.mensaje }}"
+            },
+            {
+              "name": "parse_mode",
+              "value": "Markdown"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "telegram-send",
+      "name": "📱 Enviar a Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
+        "authentication": "none",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{$env.TELEGRAM_CHAT_ID}}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.mensaje }}"
+            },
+            {
+              "name": "parse_mode",
+              "value": "Markdown"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "telegram-send-normal",
+      "name": "📱 Enviar a Telegram (normal)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 420]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.COLLECTA_API_URL || 'http://localhost:3001'}}/api/logs",
+        "authentication": "none",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "tipo",
+              "value": "REPORTE_DIARIO"
+            },
+            {
+              "name": "variante",
+              "value": "={{ $json.tipoReporte }}"
+            },
+            {
+              "name": "resultado",
+              "value": "ENVIADO"
+            },
+            {
+              "name": "mensaje",
+              "value": "Reporte diario enviado por Telegram"
+            },
+            {
+              "name": "modo",
+              "value": "PRODUCCIÓN"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-report",
+      "name": "📝 Registrar en Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 300]
+    }
+  ],
+  "connections": {
+    "⏰ Cada día 8:00 AM": {
+      "main": [
+        [{ "node": "📊 Obtener Reporte", "type": "main", "index": 0 }]
+      ]
+    },
+    "📊 Obtener Reporte": {
+      "main": [
+        [{ "node": "🔴 ¿Hay vencidas?", "type": "main", "index": 0 }]
+      ]
+    },
+    "🔴 ¿Hay vencidas?": {
+      "main": [
+        [{ "node": "🚨 Reporte URGENTE", "type": "main", "index": 0 }],
+        [{ "node": "✅ Reporte Normal", "type": "main", "index": 0 }]
+      ]
+    },
+    "🚨 Reporte URGENTE": {
+      "main": [
+        [{ "node": "📱 Enviar a Telegram", "type": "main", "index": 0 }]
+      ]
+    },
+    "✅ Reporte Normal": {
+      "main": [
+        [{ "node": "📱 Enviar a Telegram (normal)", "type": "main", "index": 0 }]
+      ]
+    },
+    "📱 Enviar a Telegram": {
+      "main": [
+        [{ "node": "📝 Registrar en Log", "type": "main", "index": 0 }]
+      ]
+    },
+    "📱 Enviar a Telegram (normal)": {
+      "main": [
+        [{ "node": "📝 Registrar en Log", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "collecta" },
+    { "name": "reporte" },
+    { "name": "automatización" }
+  ],
+  "triggerCount": 1
+}

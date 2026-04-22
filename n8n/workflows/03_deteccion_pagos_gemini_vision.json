@@ -1,0 +1,322 @@
+{
+  "name": "Collecta — Detección de Pagos con Gemini Vision",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "collecta-payment-proof",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "🔗 Webhook: Comprobante",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "collecta-payment-proof"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-image",
+              "leftValue": "={{ $json.body.image }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-has-image",
+      "name": "🖼️ ¿Tiene imagen?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={{$env.GEMINI_API_KEY}}",
+        "authentication": "none",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [\n      {\n        \"text\": \"Analiza este comprobante de pago bancario mexicano. Extrae los siguientes datos en formato JSON estricto (sin markdown, solo JSON):\\n{\\n  \\\"monto\\\": número (sin signo de pesos),\\n  \\\"fecha\\\": \\\"YYYY-MM-DD\\\",\\n  \\\"referencia\\\": \\\"string\\\",\\n  \\\"banco_origen\\\": \\\"string\\\",\\n  \\\"banco_destino\\\": \\\"string\\\",\\n  \\\"beneficiario\\\": \\\"string\\\",\\n  \\\"concepto\\\": \\\"string\\\",\\n  \\\"clabe_destino\\\": \\\"string\\\"\\n}\\nSi no puedes extraer algún campo, pon null. Responde SOLO el JSON.\"\n      },\n      {\n        \"inline_data\": {\n          \"mime_type\": \"image/jpeg\",\n          \"data\": \"{{ $json.body.image }}\"\n        }\n      }\n    ]\n  }]\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "gemini-vision",
+      "name": "🤖 Gemini Vision: Analizar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Gemini response to extract payment data\nconst geminiResponse = $input.first().json;\nlet text = '';\n\ntry {\n  text = geminiResponse.candidates[0].content.parts[0].text;\n} catch (e) {\n  return [{ json: { error: 'No se pudo leer la respuesta de Gemini', raw: geminiResponse } }];\n}\n\n// Clean the response - remove markdown code blocks if present\nlet cleaned = text.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n\ntry {\n  const parsed = JSON.parse(cleaned);\n  return [{ json: { \n    success: true, \n    paymentData: parsed,\n    rfc: $input.first().json.body?.rfc || null,\n    clientPhone: $input.first().json.body?.phone || null\n  }}];\n} catch (e) {\n  return [{ json: { \n    success: false, \n    error: 'No se pudo parsear JSON de Gemini', \n    rawText: text \n  }}];\n}\n"
+      },
+      "id": "parse-gemini",
+      "name": "🔧 Parsear respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-success",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            },
+            {
+              "id": "check-monto",
+              "leftValue": "={{ $json.paymentData.monto }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-parsed-ok",
+      "name": "✅ ¿Datos extraídos?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.COLLECTA_API_URL || 'http://localhost:3001'}}/api/n8n/webhook/payment-confirmed",
+        "authentication": "none",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"rfc\": \"{{ $json.rfc || '' }}\",\n  \"monto\": {{ $json.paymentData.monto }},\n  \"referencia\": \"{{ $json.paymentData.referencia || '' }}\",\n  \"fechaPago\": \"{{ $json.paymentData.fecha || '' }}\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "confirm-payment",
+      "name": "💰 Confirmar pago en Collecta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 120]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-matched",
+              "leftValue": "={{ $json.matched }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-matched",
+      "name": "🔍 ¿Match encontrado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1540, 120]
+    },
+    {
+      "parameters": {
+        "url": "https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
+        "authentication": "none",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{$env.TELEGRAM_CHAT_ID}}"
+            },
+            {
+              "name": "text",
+              "value": "=✅ *PAGO DETECTADO Y REGISTRADO*\n\n{{ $json.message }}\n\nOperación: {{ $json.operation.tipo }}\nMonto: ${{ $json.operation.monto }}"
+            },
+            {
+              "name": "parse_mode",
+              "value": "Markdown"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "telegram-match",
+      "name": "✅ Notificar pago OK",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1760, 40]
+    },
+    {
+      "parameters": {
+        "url": "https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
+        "authentication": "none",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{$env.TELEGRAM_CHAT_ID}}"
+            },
+            {
+              "name": "text",
+              "value": "=⚠️ *PAGO DETECTADO - SIN MATCH*\n\n{{ $json.message }}\n\nSe recibió un comprobante pero no coincide con ninguna operación pendiente.\nRevisa manualmente en Collecta."
+            },
+            {
+              "name": "parse_mode",
+              "value": "Markdown"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "telegram-no-match",
+      "name": "⚠️ Notificar sin match",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1760, 220]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Comprobante recibido y procesado' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-ok",
+      "name": "📤 Responder OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1980, 120]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: 'No se pudo analizar el comprobante' }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "respond-error-parse",
+      "name": "❌ Error parseo",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1320, 320]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: 'Imagen no proporcionada' }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "respond-no-image",
+      "name": "❌ Sin imagen",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [660, 420]
+    }
+  ],
+  "connections": {
+    "🔗 Webhook: Comprobante": {
+      "main": [
+        [{ "node": "🖼️ ¿Tiene imagen?", "type": "main", "index": 0 }]
+      ]
+    },
+    "🖼️ ¿Tiene imagen?": {
+      "main": [
+        [{ "node": "🤖 Gemini Vision: Analizar", "type": "main", "index": 0 }],
+        [{ "node": "❌ Sin imagen", "type": "main", "index": 0 }]
+      ]
+    },
+    "🤖 Gemini Vision: Analizar": {
+      "main": [
+        [{ "node": "🔧 Parsear respuesta", "type": "main", "index": 0 }]
+      ]
+    },
+    "🔧 Parsear respuesta": {
+      "main": [
+        [{ "node": "✅ ¿Datos extraídos?", "type": "main", "index": 0 }]
+      ]
+    },
+    "✅ ¿Datos extraídos?": {
+      "main": [
+        [{ "node": "💰 Confirmar pago en Collecta", "type": "main", "index": 0 }],
+        [{ "node": "❌ Error parseo", "type": "main", "index": 0 }]
+      ]
+    },
+    "💰 Confirmar pago en Collecta": {
+      "main": [
+        [{ "node": "🔍 ¿Match encontrado?", "type": "main", "index": 0 }]
+      ]
+    },
+    "🔍 ¿Match encontrado?": {
+      "main": [
+        [{ "node": "✅ Notificar pago OK", "type": "main", "index": 0 }],
+        [{ "node": "⚠️ Notificar sin match", "type": "main", "index": 0 }]
+      ]
+    },
+    "✅ Notificar pago OK": {
+      "main": [
+        [{ "node": "📤 Responder OK", "type": "main", "index": 0 }]
+      ]
+    },
+    "⚠️ Notificar sin match": {
+      "main": [
+        [{ "node": "📤 Responder OK", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "collecta" },
+    { "name": "pagos" },
+    { "name": "gemini-vision" }
+  ],
+  "triggerCount": 1
+}

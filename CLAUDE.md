@@ -1,6 +1,6 @@
 # CLAUDE.md — Collecta · Fuente de verdad absoluta para el agente
 > Lee este archivo completo antes de tocar una sola línea de código.
-> Última actualización: 2026-03-21 (reconciliación V3→V5)
+> Última actualización: 2026-04-20 (auditoría + compactación pre-fase final)
 
 ---
 
@@ -40,11 +40,23 @@ Primer cliente: **BajaTax** (despacho contable en Tijuana, México).
 
 ### Backend
 - Express 5 + TypeScript 5.9
-- Prisma 6.4.1 ORM → SQLite (`backend/prisma/dev.db`)
-- Axios 1 (llamadas HTTP a APIs de IA)
+- Prisma 6.4.1 ORM → **PostgreSQL (Neon)** vía `DATABASE_URL` + `DIRECT_URL`
+- Axios 1 (llamadas HTTP a APIs de IA y Evolution API)
 - Multer 2 (file uploads — instalado, sin rutas activas aún)
-- Better-SQLite3 (driver SQLite directo — instalado como dep de Prisma)
-- CORS, dotenv, ts-node, nodemon
+- helmet + express-rate-limit (hardening global)
+- JWT auth (`jsonwebtoken`) — `requireAuth` middleware aplicado a TODAS las rutas de datos
+- CORS (whitelist por `ALLOWED_ORIGINS`), dotenv, ts-node, nodemon
+- pino (logger estructurado)
+
+### Automatización y mensajería
+- **Evolution API** (REST) para envío/recepción programática de WhatsApp — wrapper en `backend/src/services/evolutionApi.ts`
+- **n8n** (self-hosted o n8n Cloud) para orquestar workflows — JSONs en `n8n/workflows/`
+- Webhook inbound en `/api/webhooks/evolution` (auth vía `EVOLUTION_WEBHOOK_SECRET`)
+
+### Deploy
+- **Frontend**: Vercel (collecta-azure.vercel.app, team javicanelas-projects)
+- **Backend**: Railway (Node.js, auto-deploy desde main)
+- **DB**: Neon PostgreSQL
 
 ### IA — Cascada 4 niveles (implementada en `backend/src/services/aiCascade.ts`)
 1. Gemini 1.5 Flash → `generativelanguage.googleapis.com`
@@ -84,13 +96,16 @@ Causarán color `undefined` en Tailwind. Agregar a `@theme` antes de usar.
 
 ---
 
-## 4. ARQUITECTURA DE DATOS (Prisma / SQLite)
+## 4. ARQUITECTURA DE DATOS (Prisma / PostgreSQL-Neon)
 
-DB: `backend/prisma/dev.db` (SQLite local) | ORM: Prisma 6.4.1
-Schema definitivo: `backend/prisma/schema.prisma`
+DB: PostgreSQL en Neon (producción) | ORM: Prisma 6.4.1
+Schema definitivo: `backend/prisma/schema.prisma` (provider = `"postgresql"`)
+Conexión: `DATABASE_URL` (pooler) + `DIRECT_URL` (conexión directa para migraciones)
 
 > ⚠️ Prisma schema es la ÚNICA fuente de verdad del modelo de datos.
-> Cualquier cambio de modelo requiere editar schema.prisma + `npx prisma db push` (dev).
+> Cualquier cambio de modelo requiere editar schema.prisma + `npx prisma db push`.
+> En producción, tras hacer `git pull` con un cambio de schema, correr `npx prisma db push`
+> para sincronizar Neon antes de reiniciar el backend.
 
 ### Modelo Client (Directorio)
 ```
@@ -148,7 +163,22 @@ value String
 Claves relevantes: `nombre_despacho`, `depto`, `tel`, `email`, `banco`, `clabe`,
 `beneficiario`, `modo`, `telPrueba`, `plantilla_vencido`, `plantilla_hoy`, `plantilla_recordatorio`
 
-### Modelo User (auth pendiente)
+### Modelo WhatsAppMessage (tracking Evolution API)
+```
+id             String   @id @default(cuid())
+operationId    String?  ← FK → Operation (SetNull)
+clientId       String?  ← FK → Client (SetNull)
+direction      String   ← "OUTGOING" | "INCOMING"
+messageType    String   ← "TEXT" | "IMAGE" | "DOCUMENT"
+phone          String
+content        String?
+mediaUrl       String?
+evolutionMsgId String?
+status         String   @default("SENT")  ← SENT | DELIVERED | READ | FAILED
+createdAt      DateTime @default(now())
+```
+
+### Modelo User (auth JWT activo; OAuth pendiente Phase 5)
 ```
 id        String   @id @default(cuid())
 name      String
@@ -198,70 +228,108 @@ Ver Sección 7 para tabla completa de endpoints.
 ## 6. ESTRUCTURA DE CARPETAS
 
 ```
-bajatax-v5/                    ← repo (renombrar a collecta-v5 eventualmente)
-├── frontend/                  React + TypeScript + Vite
+COLLECTA/                      ← repo (raíz del proyecto)
+├── frontend/                  React 19 + TypeScript + Vite → Vercel
 │   ├── src/
-│   │   ├── App.tsx            Entry point — definición de rutas
+│   │   ├── App.tsx            Entry point — rutas + ErrorBoundary
 │   │   ├── index.css          Tailwind v4 + tokens bt-* + .btn utilities
 │   │   ├── main.tsx           ReactDOM.createRoot
 │   │   ├── components/
-│   │   │   ├── MainLayout.tsx    Header nav + Outlet + footer
-│   │   │   ├── Sidebar.tsx       Sidebar alternativo (no activo en rutas)
-│   │   │   ├── Topbar.tsx        Barra de acciones contextual por vista
+│   │   │   ├── MainLayout.tsx        Header nav + indicador WA + Outlet + footer
+│   │   │   ├── Topbar.tsx            Barra de acciones contextual por vista
+│   │   │   ├── ErrorBoundary.tsx     Captura errores runtime
+│   │   │   ├── LoginModal.tsx        Login JWT
 │   │   │   ├── modals/
-│   │   │   │   └── NewClientModal.tsx
-│   │   │   └── ui/
-│   │   │       ├── Badge.tsx | Button.tsx | Card.tsx
-│   │   │       ├── Input.tsx | Modal.tsx | index.ts
+│   │   │   │   ├── NewClientModal.tsx
+│   │   │   │   ├── NewOperationModal.tsx
+│   │   │   │   ├── MasivoWAModal.tsx
+│   │   │   │   └── PlantillaModal.tsx
+│   │   │   ├── pdf/                  PDF con @react-pdf/renderer
+│   │   │   │   ├── PdfEstadoCuenta.tsx
+│   │   │   │   ├── PdfDefaultLayout.tsx
+│   │   │   │   └── PdfDataOverlay.tsx
+│   │   │   └── ui/                   Design system (Button, Badge, Card, Modal, Table, etc.)
 │   │   ├── views/
-│   │   │   ├── DashboardView.tsx    Operaciones (motor de cobranza)
-│   │   │   ├── DirectoryView.tsx    Directorio de clientes
-│   │   │   ├── RegistersView.tsx    Importación IA
-│   │   │   ├── ExportView.tsx       Exportar / Datos
-│   │   │   ├── ConfigView.tsx       Configuración despacho
-│   │   │   └── UIPreview.tsx        Preview UI (dev)
+│   │   │   ├── DashboardView.tsx     Operaciones (motor de cobranza)
+│   │   │   ├── DirectoryView.tsx     Directorio de clientes
+│   │   │   ├── RegistersView.tsx     Importación IA de Excel/CSV
+│   │   │   ├── ExportView.tsx        Backup + exportaciones Excel/PDF
+│   │   │   ├── ConfigView.tsx        Configuración despacho + plantillas WA
+│   │   │   ├── LogView.tsx           Log de envíos WA + pagos detectados
+│   │   │   ├── LoginView.tsx         Login screen
+│   │   │   └── UIPreview.tsx         Preview UI (dev)
 │   │   ├── services/
-│   │   │   ├── api.ts               Fetch wrapper (base: localhost:3001/api)
-│   │   │   ├── operationService.ts  CRUD operaciones + extract + pago
-│   │   │   ├── clientService.ts     CRUD clientes
-│   │   │   └── exportService.ts     Exportaciones Excel/JSON
-│   │   ├── stores/
-│   │   │   ├── useOperationStore.ts  Zustand — operaciones
-│   │   │   ├── useClientStore.ts     Zustand — clientes
-│   │   │   └── useAuthStore.ts       Zustand — auth (pendiente de implementar)
-│   │   └── types/
-│   │       └── index.ts              Interfaces TS (sincronizar con Prisma schema)
-│   ├── package.json
-│   └── vite.config.ts
-├── backend/                   Express + TypeScript + Prisma
+│   │   │   ├── api.ts                Fetch wrapper (VITE_API_URL)
+│   │   │   ├── authService.ts        Login + JWT
+│   │   │   ├── operationService.ts   CRUD operaciones + pago
+│   │   │   ├── clientService.ts      CRUD clientes
+│   │   │   ├── logService.ts         Logs
+│   │   │   ├── exportService.ts      Exportaciones Excel/JSON
+│   │   │   └── pdfService.tsx        Generación PDF cliente-side
+│   │   ├── stores/                   Zustand stores
+│   │   │   ├── useAuthStore.ts       Auth + JWT en localStorage
+│   │   │   ├── useOperationStore.ts
+│   │   │   └── useClientStore.ts
+│   │   ├── pdf-templates/            PDFs (EstadoCuentaPDF, ReporteCxCPDF) — consolidar con components/pdf/
+│   │   ├── hooks/                    useTheme, useToast
+│   │   ├── utils/                    whatsapp helpers
+│   │   ├── constants/ brand/ assets/
+│   │   └── types/index.ts            Interfaces TS (sincronizar con Prisma)
+│   ├── package.json | vite.config.ts | tsconfig.*
+├── backend/                   Express 5 + TypeScript + Prisma → Railway
 │   ├── src/
-│   │   ├── index.ts           Entry point — middleware + rutas registradas
+│   │   ├── index.ts           Entry — helmet + rateLimit + CORS + requireAuth en TODAS las rutas de datos
 │   │   ├── routes/
+│   │   │   ├── auth.ts        /api/auth — login JWT
 │   │   │   ├── clients.ts     /api/clients — CRUD + toggle-status
 │   │   │   ├── operations.ts  /api/operations — CRUD + pay + archive + stats
 │   │   │   ├── config.ts      /api/config — upsert + backup + restore + purge
 │   │   │   ├── extract.ts     /api/extract — AI cascade mapping
-│   │   │   └── logs.ts        /api/logs — GET only (POST pendiente)
+│   │   │   ├── import.ts      /api/import — batch import con IA
+│   │   │   ├── logs.ts        /api/logs — GET + POST (LogEntry)
+│   │   │   ├── cobranza.ts    /api/cobranza — PDF estado de cuenta + envío
+│   │   │   ├── n8n.ts         /api/n8n — webhooks para workflows (API_KEY)
+│   │   │   ├── whatsapp.ts    /api/whatsapp — status + send + send-media (Evolution API)
+│   │   │   └── webhooks.ts    /api/webhooks/evolution — inbound WA (EVOLUTION_WEBHOOK_SECRET)
 │   │   ├── services/
-│   │   │   ├── aiCascade.ts   Cascada IA (Gemini→Groq→OpenRouter→Regex)
-│   │   │   └── database.ts    (existe — funcionalidad pendiente de verificar)
-│   │   └── lib/
-│   │       └── prisma.ts      Singleton PrismaClient
+│   │   │   ├── aiCascade.ts        Cascada IA (Gemini→Groq→OpenRouter→Regex)
+│   │   │   ├── evolutionApi.ts     Wrapper Evolution API (sendText, sendMedia, status)
+│   │   │   ├── pdfGenerator.ts     PDF buffer con pdfkit (para envío vía WA en Phase 4)
+│   │   │   ├── importService.ts    Procesamiento de batch imports
+│   │   │   └── cache.ts            Cache en memoria
+│   │   ├── middleware/
+│   │   │   └── auth.ts             requireAuth (JWT + API_KEY para n8n)
+│   │   ├── lib/
+│   │   │   ├── prisma.ts           Singleton PrismaClient
+│   │   │   └── logger.ts           pino
+│   │   └── __tests__/              Vitest — auth, clients, operations
 │   ├── prisma/
-│   │   ├── schema.prisma      Definición de modelos (FUENTE DE VERDAD)
-│   │   └── dev.db             SQLite database (gitignore)
-│   ├── .env                   Variables de entorno (NO commitear — en gitignore)
-│   ├── .env.example           Plantilla de variables (SÍ commitear)
-│   └── package.json
+│   │   └── schema.prisma      Definición de modelos (FUENTE DE VERDAD — PostgreSQL)
+│   ├── data/
+│   │   └── SINONIMOS_COLUMNAS.json  Copia local del diccionario IA
+│   ├── .env                   Variables de entorno (gitignore)
+│   ├── .env.example           Plantilla con Evolution + Neon + JWT
+│   └── package.json | tsconfig.json | vitest.config.ts
+├── n8n/                       Workflows de automatización (self-hosted o n8n Cloud)
+│   ├── workflows/
+│   │   ├── 01_reporte_diario_cartera.json
+│   │   ├── 02_cobranza_automatica_whatsapp.json
+│   │   ├── 03_deteccion_pagos_gemini_vision.json
+│   │   └── 04_cobranza_email_pdf.json
+│   ├── README.md              Instrucciones de deploy
+│   └── .env.example           Evolution API + n8n env vars
 ├── data/
 │   ├── SINONIMOS_COLUMNAS.json   Diccionario de alias — motor de importación IA
 │   └── archivo_ejemplo/          Archivos Excel/CSV de muestra para pruebas
-├── legacy/
-│   ├── BAJATAX_APP_legacy.html   HTML monolítico V3 (referencia histórica — no tocar)
-│   └── modules/
-├── docs/                          Documentación y specs legacy (referencia)
-├── specs/                         Specs activos del proyecto
-└── CLAUDE.md                      Este archivo — fuente de verdad
+├── docs/
+│   ├── playbook/
+│   │   └── COLLECTA_SAAS_AGENT_PLAYBOOK.md   Playbook maestro (Apr 15)
+│   └── specs/
+│       ├── agent.md
+│       ├── pdf-generation.md
+│       └── whatsapp-flow.md
+├── CLAUDE.md                      Este archivo — fuente de verdad
+└── README.md
 ```
 
 ---
@@ -382,34 +450,80 @@ npm run lint                # ESLint
 
 ---
 
-## 11. FEATURES PENDIENTES Y BUGS CONOCIDOS
+## 11. ESTADO DEL PROYECTO (actualizado 2026-04-20)
 
-> ⚠️ **AUDITORÍA 2026-04-06**: La mayoría de los errores listados abajo YA ESTÁN RESUELTOS.
-> Verificar con código real antes de marcar como pendientes.
+### ✅ Completado — Phase 0 + Phase 1 (commit 42a0a25, 2026-04-17)
+- [x] Migración PostgreSQL/Neon (schema con `provider = "postgresql"`)
+- [x] `requireAuth` middleware aplicado a TODAS las rutas de datos en `index.ts`
+- [x] Fix import bug: `logsRoutes` ahora apunta a `./routes/logs` (no `./routes/import`)
+- [x] helmet + express-rate-limit + CORS whitelist en producción
+- [x] pino logger estructurado con request_id
+- [x] Login JWT completo (`POST /api/auth/login`, `useAuthStore`, LoginModal, LoginView)
+- [x] Evolution API wrapper (`backend/src/services/evolutionApi.ts`)
+- [x] Rutas `/api/whatsapp` (status + send + send-media) con `requireAuth`
+- [x] Rutas `/api/webhooks/evolution` con `EVOLUTION_WEBHOOK_SECRET`
+- [x] Modelo `WhatsAppMessage` en Prisma schema
+- [x] Indicador WA en header (`MainLayout.tsx`, poll cada 30s)
+- [x] `.env.example` con Evolution + Neon + JWT + webhook secret
+- [x] Cobranza endpoints `/api/cobranza` (estado de cuenta PDF)
+- [x] 4 workflows n8n en `n8n/workflows/` (reporte diario, cobranza WA, Gemini Vision, email/PDF)
+- [x] UI: Modal "+ Operación", checkbox masivo + batch pay, MasivoWAModal con progreso, LogView funcional
+- [x] bt-purple y bt-gold en `@theme`
 
-### ✅ Resueltos (verificado código 2026-04-06)
-- [x] MainLayout.tsx — "BajaTax" → "Collecta" (lines 192-193)
-- [x] POST /api/logs en `backend/src/routes/logs.ts` (lines 46-68)
-- [x] bt-purple y bt-gold en `@theme` (index.css lines 185-191)
-- [x] Modal "+ Operación" funcional (DashboardView.tsx:250)
-- [x] Checkbox selección masiva + batch pay (DashboardView.tsx:578-588, 452-463)
-- [x] Masivo WA con setInterval 1500ms + progress (MasivoWAModal.tsx:175-187)
-- [x] LogService.create integration después de window.open (MasivoWAModal.tsx:131-141)
+### ⚠️ Post-Phase-1 — Acciones CRÍTICAS al hacer pull
+1. **`cd backend && npx prisma db push`** en Railway/Neon — el modelo `WhatsAppMessage` NO existe en prod aún. Sin esto, los endpoints de Evolution API crasean al primer uso.
+2. Configurar env vars en Railway: `EVOLUTION_API_URL`, `EVOLUTION_INSTANCE`, `EVOLUTION_API_KEY`, `EVOLUTION_WEBHOOK_SECRET`, `PAYMENT_DETECTION_WEBHOOK_URL`.
 
-### 🔴 Crítico — Pendientes reales
-- [ ] Badge de vencidas dinámico en nav (verificar store calculation)
-- [ ] Verificar que todos los endpoints de logs funcionen correctamente
+### 🔴 Phase 2 — Scheduling mensual (semana 2-3)
+- [ ] `GET /api/n8n/monthly-collections?type=initial` (día 1 — todos los clientes con ops pendientes)
+- [ ] `GET /api/n8n/monthly-collections?type=followup` (día 15 — solo quienes no pagaron)
+- [ ] Variables nuevas: `{MES}`, `{TOTAL_PENDIENTE}`, `{NUM_OPERACIONES}`
+- [ ] Config keys: `plantilla_mensual_inicio`, `plantilla_mensual_seguimiento`
+- [ ] Workflows: `n8n/workflows/05_cobranza_mensual_inicio.json` + `06_cobranza_mensual_seguimiento.json`
+- [ ] ConfigView: editores de plantillas mensuales
 
-### 🟠 Alta prioridad — Pendientes reales
-- [ ] Toggle ACTIVO/SUSPENDIDO en UI directorio (falta UI, endpoint existe)
-- [ ] Ver operaciones desde directorio (navegar a / + filtro por RFC)
-- [ ] Plantillas WA con preview tipo WhatsApp y chips de variables clicables
-- [ ] Botón "Probar conexión IA" → POST /api/extract/test
+### 🔴 Phase 3 — Pipeline detección de pagos (semana 3-4)
+- [ ] Conectar webhook Evolution → n8n workflow #3 (Gemini Vision OCR)
+- [ ] Mejorar `POST /api/n8n/webhook/payment-confirmed` (matching por `phone`, no solo `rfc`)
+- [ ] Confirmación WA automática tras registrar pago
+- [ ] LogView: tab "Pagos Detectados" + thumbnails + match manual
+- [ ] `ManualPaymentMatchModal.tsx`
 
-### 🟡 Media — Pendientes reales
+### 🔴 Phase 4 — PDF vía WhatsApp (semana 4-5)
+- [ ] `generateEstadoCuentaBuffer(rfc): Promise<Buffer>` en `pdfGenerator.ts`
+- [ ] `POST /api/cobranza/cliente/:rfc/send-pdf-wa` (sendMedia document)
+- [ ] n8n workflow #4: branch cliente con phone → WA, solo email → email, ambos → ambos
+- [ ] Botón "Enviar PDF por WA" en DashboardView + DirectoryView
+
+### 🟠 Phase 5 — OAuth Google (semana 5-6)
+- [ ] `google-auth-library` backend + `@react-oauth/google` frontend
+- [ ] `POST /api/auth/google` con whitelist de emails
+- [ ] Ampliar modelo `User` (googleId, avatarUrl, lastLoginAt, isActive)
+- [ ] Endpoints admin `/api/users` (listar, invitar, toggle, delete)
+- [ ] `UsersView.tsx` con ruta `/usuarios`
+
+### 🟡 Phase 6 — Dashboard de reporting (semana 6-8)
+- [ ] `recharts` en frontend
+- [ ] `ReportingView.tsx` — KPI cards + bar/pie/line charts + top debtors
+- [ ] `GET /api/operations/stats/report` — agregados 12 meses + distribución status + performance asesor
 - [ ] Excel con formato (header navy, colores por estatus, freeze row 1, autofit)
-- [ ] VITE_API_URL env var en frontend (actualmente hardcoded)
-- [ ] PDF Estado de Cuenta: header dinámico desde config (verificar no hardcodeado)
+- [ ] Dark mode tokens + sidebar colapsable mobile + shortcuts Ctrl+N/Ctrl+F
+- [ ] Sparklines en KPI cards
+
+### 🟡 Phase 7 — CI/CD + monitoreo (semana 8-9)
+- [ ] `frontend/vercel.json` con rewrites SPA
+- [ ] `ALLOWED_ORIGINS` completo en Railway
+- [ ] `n8n/docker-compose.yml` (opción self-hosted) o n8n Cloud
+- [ ] `.github/workflows/ci.yml` + `.github/workflows/test.yml`
+- [ ] UptimeRobot + alertas Railway + Telegram error bot
+
+### 🟢 Mejoras menores pendientes
+- [ ] Toggle ACTIVO/SUSPENDIDO en UI directorio (endpoint existe)
+- [ ] Ver operaciones desde directorio (navegar a / + filtro por RFC)
+- [ ] Plantillas WA con preview tipo WhatsApp + chips variables
+- [ ] Botón "Probar conexión IA" → `POST /api/extract/test`
+- [ ] VITE_API_URL env var (ya usado en `services/api.ts`, verificar que esté en Vercel)
+- [ ] Consolidar `pdf-templates/` en `components/pdf/` (eliminar duplicación)
 
 ---
 
@@ -620,47 +734,43 @@ Datos: Beneficiario: {BENEFICIARIO} | Banco: {BANCO} | CLABE: {CLABE}
 
 ---
 
-## 16. ROADMAP PRIORIZADO
+## 16. ROADMAP — alineado con `plans/scalable-noodling-kurzweil.md`
 
-### Fase 1 — Identidad + Infraestructura base (COMPLETADO)
-1. ✅ Reemplazar "BajaTax" → "Collecta" en MainLayout.tsx (header + footer)
-2. ✅ Agregar `bt-purple` y `bt-gold` a `@theme` en index.css
-3. ✅ Implementar `POST /api/logs` (crear LogEntry)
-4. ✅ Implementar LogView en `/logs` con renderizado de entradas
-5. ✅ Registro de LogEntry en cada envío WA (después de `window.open()`)
+### ✅ Phase 0 — Security fix (COMPLETADO, commit 42a0a25)
+`requireAuth` en todas las rutas + fix import + helmet + rate-limit + pino.
 
-### Fase 2 — Importación completa (COMPLETADO)
-6. ✅ Selects editables de mapeo de columnas con % confianza visual (verde/naranja/rojo)
-7. ✅ Anti-duplicado (RFC + tipo + |monto| < 0.01) con contador de omisiones
-8. ✅ Advertencia visible cuando filas no tienen cliente en directorio
+### ✅ Phase 1 — Evolution API integration (COMPLETADO, commit 42a0a25)
+`evolutionApi.ts` + rutas `/api/whatsapp` + `/api/webhooks/evolution` + modelo `WhatsAppMessage` + indicador frontend.
 
-### Fase 3 — Features core de cobranza (COMPLETADO)
-9. ✅ Modal "+ Operación" funcional (clientId via búsqueda, tipo, descripción, monto, fechaVence)
-10. ✅ Checkbox selección masiva + "Marcar N como pagado" en DashboardView
-11. ✅ Modal Masivo WA (setInterval 1500ms, progress, log entries)
-12. ✅ Badge de vencidas dinámico en navegación (del store)
+### ✅ Fases V5 previas (base funcional — ver historial git)
+- Importación IA con anti-duplicado, LogView, Modal Operación, masivo WA, checkbox batch pay, JWT auth, PDF @react-pdf/renderer, 4 workflows n8n.
 
-### Fase 4 — Directorio + Config (EN PROGRESO)
-13. [ ] Toggle estado cliente (badge clickeable con confirm)
-14. [ ] Ver operaciones desde directorio (navegar a / + filtrar por RFC)
-15. [ ] Plantillas WA con preview y chips de variables
-16. [ ] Botón "Probar conexión IA"
+### 🔴 Phase 2 — Scheduling mensual (semana 2-3, SIGUIENTE)
+- `GET /api/n8n/monthly-collections?type=initial|followup`
+- Workflows `05_*.json` (día 1) + `06_*.json` (día 15)
+- Plantillas mensuales en ConfigView
 
-### Fase 5 — PDF + Exportaciones (COMPLETADO)
-17. ✅ genPDF() con @react-pdf/renderer (nombre dinámico del despacho)
-18. [ ] Excel con formato (header navy, colores por estatus, freeze row 1, autofit)
-19. [ ] Reporte CxC PDF por asesor
+### 🔴 Phase 3 — Pipeline detección de pagos (semana 3-4)
+- Webhook Evolution → n8n workflow #3 → Gemini Vision OCR → `POST /api/n8n/webhook/payment-confirmed`
+- Match por `phone` + confirmación WA
+- LogView tab "Pagos Detectados" + `ManualPaymentMatchModal.tsx`
 
-### Fase 6 — Auth + SaaS (EN PROGRESO)
-20. ✅ Login simple JWT (POST /api/auth/login, middleware protect, useAuthStore)
-21. [ ] Modelo multi-tenant para soportar múltiples despachos-clientes
-22. [ ] Variables de entorno frontend (VITE_API_URL)
+### 🔴 Phase 4 — PDF vía WhatsApp (semana 4-5)
+- `generateEstadoCuentaBuffer` + `POST /api/cobranza/cliente/:rfc/send-pdf-wa`
+- Botón "Enviar PDF por WA" en DashboardView/DirectoryView
+- Workflow #4 branch WA/email
 
-### Fase 7 — Pulido
-23. [ ] Dark mode (Tailwind `dark:` classes)
-24. [ ] Stitch template (evaluar integración o mantener Tailwind puro)
-25. [ ] Sidebar con badges dinámicos
-26. [ ] Responsive móvil
+### 🟠 Phase 5 — OAuth Google (semana 5-6)
+- `google-auth-library` + `@react-oauth/google`
+- `POST /api/auth/google` + whitelist
+- `UsersView.tsx` admin-only
+
+### 🟡 Phase 6 — Dashboard reporting + pulido (semana 6-8)
+- `recharts` + `ReportingView.tsx`
+- Excel con formato, dark mode, shortcuts, sparklines, mobile responsive
+
+### 🟡 Phase 7 — CI/CD + monitoreo (semana 8-9)
+- `frontend/vercel.json`, GitHub Actions, n8n docker-compose o n8n Cloud, UptimeRobot
 
 ---
 
