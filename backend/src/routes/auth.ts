@@ -108,18 +108,20 @@ router.post('/verify', (req: Request, res: Response) => {
 router.post('/debug', (req: Request, res: Response) => {
   const { email, password } = req.body || {};
   const ADMIN_USER_LOWER = ADMIN_USER?.toLowerCase() || 'UNSET';
-  const ADMIN_PASS_VAL = ADMIN_PASS || 'UNSET';
   const emailInputLower = (email || '').toLowerCase();
   const emailMatch = emailInputLower === ADMIN_USER_LOWER ||
     emailInputLower === `${ADMIN_USER_LOWER}@collecta.local`;
+  const rawBytes = ADMIN_PASS ? Array.from(ADMIN_PASS).map(c => c.charCodeAt(0)) : [];
   res.json({
     env_ADMIN_USER: ADMIN_USER,
-    env_ADMIN_PASS: ADMIN_PASS ? `[SET:${ADMIN_PASS.length} chars]` : 'UNSET',
-    input_EMAIL: email,
-    input_PASS: password ? `[SET:${password.length} chars]` : 'UNSET',
-    emailMatch,
+    env_ADMIN_PASS_rawLength: ADMIN_PASS?.length ?? 0,
+    env_ADMIN_PASS_first5: ADMIN_PASS?.slice(0, 5),
+    env_ADMIN_PASS_last3: ADMIN_PASS?.slice(-3),
+    env_ADMIN_PASS_bytes: rawBytes,
+    inputPass_rawLength: password?.length ?? 0,
+    inputPass_first5: password?.slice(0, 5),
     passwordMatch: password === ADMIN_PASS,
-    allValid: isValidAdminCredentials(email || '', password || ''),
+    jwt_secret_length: JWT_SECRET?.length ?? 0,
   });
 });
 
