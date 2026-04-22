@@ -9,7 +9,7 @@ export default function LoginView() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
-    const ok = await login('admin', '888');
+    const ok = await login('admin', 'Collecta2025!');
     if (!ok) {
       setError('Error de conexión. Intenta de nuevo.');
     }
