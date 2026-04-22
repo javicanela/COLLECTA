@@ -65,7 +65,7 @@ app.use((req, _res, next) => {
 });
 
 // CORS configuration
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,https://collecta-azure.vercel.app')
   .split(',')
   .map(o => o.trim());
 
