@@ -4,21 +4,14 @@ import { useAuthStore } from '../stores/useAuthStore';
 export default function LoginView() {
   const login = useAuthStore((s) => s.login);
   const isLoading = useAuthStore((s) => s.isLoading);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!email.trim() || !password) {
-      setError('Completa todos los campos');
-      return;
-    }
-    const ok = await login(email.trim(), password);
+    const ok = await login('admin', '888');
     if (!ok) {
-      setError('Credenciales inválidas. Intenta de nuevo.');
-      setPassword('');
+      setError('Error de conexión. Intenta de nuevo.');
     }
   };
 
@@ -167,7 +160,7 @@ export default function LoginView() {
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
+              {/* <div>
                 <label
                   htmlFor="login-email"
                   className="block text-[11px] font-semibold tracking-widest text-white/70 uppercase mb-2"
@@ -209,7 +202,7 @@ export default function LoginView() {
                   />
                   <LockIcon className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/40" />
                 </div>
-              </div>
+              </div> */}
 
               {/* Headline */}
               <div className="pt-4">
@@ -364,23 +357,7 @@ function ShieldLogo() {
   );
 }
 
-function UserIcon({ className = '' }: { className?: string }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
-      <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M4 20c0-4 4-6 8-6s8 2 8 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
 
-function LockIcon({ className = '' }: { className?: string }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
-      <rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M8 11V8a4 4 0 0 1 8 0v3" stroke="currentColor" strokeWidth="1.8" />
-    </svg>
-  );
-}
 
 function DiamondSparkle({ className = '' }: { className?: string }) {
   return (

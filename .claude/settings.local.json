@@ -104,7 +104,28 @@
       "Bash(cat /c/Users/LENOVO/.claude/session-env/vercel* ls /c/Users/LENOVO/.claude/plugins/)",
       "Bash(/c/Users/LENOVO/AppData/Roaming/npm/tsc.cmd -b --noEmit)",
       "mcp__plugin_vercel-plugin_vercel__list_deployments",
-      "Bash(node_modules/.bin/tsc --noEmit)"
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(where n8n *)",
+      "Bash(where node *)",
+      "Bash(where npx *)",
+      "Bash(n8n --version)",
+      "Read(//c/Users/LENOVO/.n8n/**)",
+      "Bash(mkdir -p \"C:/Users/LENOVO/n8n-local\")",
+      "Read(//c/Users/LENOVO/**)",
+      "Bash(powershell *)",
+      "Bash(./node_modules/.bin/tsc --noEmit -p tsconfig.app.json)",
+      "mcp__plugin_ecc_playwright__browser_navigate",
+      "Bash(start \"\" \"https://chromewebstore.google.com/detail/playwright-mcp-bridge/mmlmfjhmonkocbjadbfplnigmagldckm\")",
+      "mcp__plugin_ecc_playwright__browser_tabs",
+      "Bash(npm view *)",
+      "mcp__plugin_ecc_playwright__browser_snapshot",
+      "mcp__plugin_ecc_playwright__browser_take_screenshot",
+      "mcp__plugin_ecc_playwright__browser_console_messages",
+      "mcp__plugin_ecc_playwright__browser_fill_form",
+      "mcp__plugin_ecc_playwright__browser_click",
+      "mcp__plugin_ecc_playwright__browser_network_requests",
+      "Bash(railway --version)",
+      "Bash(railway whoami *)"
     ]
   }
 }
