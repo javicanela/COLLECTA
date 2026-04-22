@@ -4,7 +4,7 @@
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.PROD
-    ? 'https://collecta-personal-token.up.railway.app/api'
+    ? 'https://collecta-production.up.railway.app/api'
     : 'http://localhost:3001/api');
 const API_KEY = import.meta.env.VITE_API_KEY || '';
 
