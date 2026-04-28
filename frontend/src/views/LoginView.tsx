@@ -4,14 +4,20 @@ import { useAuthStore } from '../stores/useAuthStore';
 export default function LoginView() {
   const login = useAuthStore((s) => s.login);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
-    const ok = await login('admin', 'Collecta2025!');
+    if (!email || !password) {
+      setError('Ingresa tu usuario y contraseña.');
+      return;
+    }
+    const ok = await login(email, password);
     if (!ok) {
-      setError('Error de conexión. Intenta de nuevo.');
+      setError('Credenciales inválidas. Intenta de nuevo.');
     }
   };
 
@@ -160,7 +166,7 @@ export default function LoginView() {
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* <div>
+              <div>
                 <label
                   htmlFor="login-email"
                   className="block text-[11px] font-semibold tracking-widest text-white/70 uppercase mb-2"
@@ -202,7 +208,7 @@ export default function LoginView() {
                   />
                   <LockIcon className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/40" />
                 </div>
-              </div> */}
+              </div>
 
               {/* Headline */}
               <div className="pt-4">

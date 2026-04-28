@@ -8,9 +8,12 @@ const ADMIN_USER = process.env.ADMIN_USER;
 const ADMIN_PASS = process.env.ADMIN_PASS;
 const TOKEN_EXPIRY = '24h';
 
-console.log('[AUTH] JWT_SECRET:', JWT_SECRET ? 'SET' : 'UNSET');
-console.log('[AUTH] ADMIN_USER:', ADMIN_USER);
-console.log('[AUTH] ADMIN_PASS:', ADMIN_PASS);
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  console.warn('[AUTH] WARNING: JWT_SECRET is not set or too short (min 32 chars)');
+}
+if (!ADMIN_USER || !ADMIN_PASS) {
+  console.warn('[AUTH] WARNING: ADMIN_USER or ADMIN_PASS is not set');
+}
 
 function isValidSecret(): boolean {
   return !!(JWT_SECRET && JWT_SECRET.length >= 32);
@@ -50,9 +53,7 @@ router.post('/login', (req: Request, res: Response) => {
   };
 
   try {
-    console.log('[LOGIN] Attempting to sign JWT with payload:', payload);
     const token = jwt.sign(payload, JWT_SECRET as string, { expiresIn: TOKEN_EXPIRY });
-    console.log('[LOGIN] JWT signed successfully');
 
     res.json({
       token,
@@ -64,7 +65,6 @@ router.post('/login', (req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    console.log('[LOGIN] Error generating token:', err);
     res.status(500).json({ error: 'Error generando token' });
   }
 });

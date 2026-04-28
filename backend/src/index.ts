@@ -16,6 +16,7 @@ import cobranzaRoutes from './routes/cobranza';
 import n8nRoutes from './routes/n8n';
 import whatsappRoutes from './routes/whatsapp';
 import webhookRoutes from './routes/webhooks';
+import agentRoutes from './routes/agent';
 import { requireAuth } from './middleware/auth';
 
 dotenv.config();
@@ -108,6 +109,7 @@ app.use('/api/import', requireAuth, importRoutes);
 app.use('/api/cobranza', requireAuth, cobranzaRoutes);
 app.use('/api/n8n', requireAuth, n8nRoutes);
 app.use('/api/whatsapp', requireAuth, whatsappRoutes);
+app.use('/api/agent', requireAuth, agentRoutes);
 app.use('/api/webhooks', webhookRoutes); // Uses its own auth (X-Webhook-Secret)
 
 // Error handler - don't expose error messages in production

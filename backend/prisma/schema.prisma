@@ -33,6 +33,7 @@ model Client {
   operations       Operation[]
   logEntries       LogEntry[]
   whatsAppMessages WhatsAppMessage[]
+  agentActions     AgentAction[]
 }
 
 model Operation {
@@ -85,4 +86,55 @@ model WhatsAppMessage {
   evolutionMsgId String?
   status         String     @default("SENT")
   createdAt      DateTime   @default(now())
+}
+
+// ─── Agente Autónomo ───────────────────────────────────────────
+
+model AgentExecution {
+  id               String        @id @default(cuid())
+  status           String        @default("PENDING")   // PENDING | RUNNING | PAUSED | COMPLETED | STOPPED | FAILED
+  phase            String        @default("COLLECT")   // COLLECT | ANALYZE | EXECUTE | MONITOR
+  progress         Int           @default(0)           // 0-100
+  startedAt        DateTime      @default(now())
+  completedAt      DateTime?
+  totalActions     Int           @default(0)
+  completedActions Int           @default(0)
+  failedActions    Int           @default(0)
+  cancelledActions Int           @default(0)
+  triggeredBy      String        @default("SCHEDULE")  // SCHEDULE | MANUAL | WEBHOOK
+  notes            String?
+  tenantId         String        @default("default")
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  actions          AgentAction[]
+}
+
+model AgentAction {
+  id          String         @id @default(cuid())
+  executionId String
+  execution   AgentExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  clientId    String?
+  client      Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  type        String                         // WHATSAPP_MESSAGE | WHATSAPP_PDF | FOLLOWUP | EMAIL
+  status      String         @default("PENDING") // PENDING | EXECUTING | COMPLETED | FAILED | CANCELLED
+  message     String?
+  phone       String?
+  sentAt      DateTime?
+  error       String?
+  tenantId    String         @default("default")
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model AgentConfig {
+  id              String   @id @default(cuid())
+  tenantId        String   @default("default") @unique
+  scheduleEnabled Boolean  @default(true)
+  scheduleCron    String   @default("0 9 1,15 * *") // 1 y 15 a las 9:00 AM
+  maxDailySends   Int      @default(100)
+  rateLimitMs     Int      @default(1500)
+  sendPdfEnabled  Boolean  @default(true)
+  notifyOnFail    Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
