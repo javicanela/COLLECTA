@@ -11,6 +11,7 @@ import ConfigView from './views/ConfigView';
 import ExportView from './views/ExportView';
 import UIPreview from './views/UIPreview';
 import LogView from './views/LogView';
+import AgentView from './views/AgentView';
 import { useAuthStore } from './stores/useAuthStore';
 import './App.css';
 
@@ -59,6 +60,7 @@ function AppRoutes() {
           <Route path="directorio" element={<AnimatedRoute><DirectoryView /></AnimatedRoute>} />
           <Route path="registros" element={<AnimatedRoute><RegistersView /></AnimatedRoute>} />
           <Route path="exportar" element={<AnimatedRoute><ExportView /></AnimatedRoute>} />
+          <Route path="agente" element={<AnimatedRoute><AgentView /></AnimatedRoute>} />
           <Route path="config" element={<AnimatedRoute><ConfigView /></AnimatedRoute>} />
           {import.meta.env.DEV && <Route path="ui-preview" element={<AnimatedRoute><UIPreview /></AnimatedRoute>} />}
           <Route path="logs" element={<AnimatedRoute><LogView /></AnimatedRoute>} />

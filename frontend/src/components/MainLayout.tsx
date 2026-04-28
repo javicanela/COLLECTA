@@ -4,7 +4,7 @@ import { api } from '../services/api';
 import {
   LayoutDashboard, Users, Upload, Download,
   Settings, ScrollText, Sun, Moon, Menu, X,
-  Zap, AlertCircle, Wallet, ChevronRight, Home,
+  Zap, AlertCircle, Wallet, ChevronRight, Home, Bot,
 } from 'lucide-react';
 import { useOperationStore } from '../stores/useOperationStore';
 import { useTheme } from '../hooks/useTheme';
@@ -13,12 +13,13 @@ import ToastContainer from './ui/ToastContainer';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const menuItems = [
-  { id: 'ops', label: 'Operaciones', icon: LayoutDashboard, path: '/' },
-  { id: 'reg', label: 'Registros', icon: Upload, path: '/registros' },
-  { id: 'dir', label: 'Directorio', icon: Users, path: '/directorio' },
-  { id: 'exp', label: 'Exportar', icon: Download, path: '/exportar' },
-  { id: 'log', label: 'Logs', icon: ScrollText, path: '/logs' },
-  { id: 'conf', label: 'Config', icon: Settings, path: '/config' },
+  { id: 'ops',    label: 'Operaciones', icon: LayoutDashboard, path: '/' },
+  { id: 'reg',    label: 'Registros',   icon: Upload,          path: '/registros' },
+  { id: 'dir',    label: 'Directorio',  icon: Users,           path: '/directorio' },
+  { id: 'exp',    label: 'Exportar',    icon: Download,        path: '/exportar' },
+  { id: 'agent',  label: 'Agente IA',   icon: Bot,             path: '/agente' },
+  { id: 'log',    label: 'Logs',        icon: ScrollText,      path: '/logs' },
+  { id: 'conf',   label: 'Config',      icon: Settings,        path: '/config' },
 ];
 
 const pageTitles: Record<string, { title: string; subtitle: string }> = {
@@ -26,6 +27,7 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/registros': { title: 'Registros', subtitle: 'Importación de datos desde Excel o CSV' },
   '/directorio': { title: 'Directorio', subtitle: 'Base de clientes del despacho' },
   '/exportar': { title: 'Exportar', subtitle: 'Exportaciones y estadísticas' },
+  '/agente': { title: 'Agente IA', subtitle: 'Cobranza autónoma con IA' },
   '/logs': { title: 'Logs', subtitle: 'Historial de envíos de cobranza' },
   '/config': { title: 'Configuración', subtitle: 'Configuración del sistema' },
 };
