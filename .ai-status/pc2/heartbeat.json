@@ -1,8 +1,8 @@
 {
-    "updated_at":  "2026-04-29 15:30:34",
+    "updated_at":  "2026-04-29 15:32:10",
     "last_result":  "",
-    "notes":  "No tasks",
+    "notes":  "Task started",
     "worker":  "pc2",
-    "status":  "online_idle",
-    "task":  ""
+    "status":  "working",
+    "task":  "prueba-dashboard-v41"
 }
