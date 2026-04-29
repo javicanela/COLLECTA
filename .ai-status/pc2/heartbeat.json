@@ -1,8 +1,8 @@
 {
-  "worker":"pc2",
-  "status":"unknown",
-  "task":"",
-  "updated_at":"",
-  "last_result":"",
-  "notes":"awaiting runner v4.1"
+    "updated_at":  "2026-04-29 15:24:15",
+    "last_result":  "",
+    "notes":  "Runner started",
+    "worker":  "pc2",
+    "status":  "online_idle",
+    "task":  ""
 }
