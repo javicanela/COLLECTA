@@ -1,8 +1,8 @@
 {
-    "updated_at":  "2026-04-29 15:40:59",
+    "updated_at":  "2026-04-29 15:42:34",
     "last_result":  "",
-    "notes":  "No tasks",
+    "notes":  "Task started",
     "worker":  "pc2",
-    "status":  "online_idle",
-    "task":  ""
+    "status":  "working",
+    "task":  "revision-rapida-de-docs"
 }
