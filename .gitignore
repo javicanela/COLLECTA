@@ -52,3 +52,5 @@ n8n/templates/
 test-*.js
 debug-*.js
 /*.png
+
+.ai-status/*/status-live.json
