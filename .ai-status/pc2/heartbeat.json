@@ -1,8 +1,8 @@
 {
-    "updated_at":  "2026-04-29 16:44:54",
-    "last_result":  "",
-    "notes":  "Task started",
+    "updated_at":  "2026-04-29 16:45:52",
+    "last_result":  "success",
+    "notes":  "Task completed",
     "worker":  "pc2",
-    "status":  "working",
+    "status":  "online_idle",
     "task":  "test-profile"
 }
