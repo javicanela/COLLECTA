@@ -1,8 +1,8 @@
 ﻿{
-    "updated_at":  "2026-04-29 17:22:31",
-    "last_result":  "",
-    "notes":  "OpenCode running",
+    "updated_at":  "2026-04-29 17:23:14",
+    "last_result":  "success",
+    "notes":  "Task completed",
     "worker":  "pc2",
-    "status":  "running_opencode",
+    "status":  "online_idle",
     "task":  "prueba-runner-v51"
 }
