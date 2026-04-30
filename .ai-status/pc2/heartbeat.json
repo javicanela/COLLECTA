@@ -1,8 +1,8 @@
 ﻿{
-    "updated_at":  "2026-04-29 17:20:46",
+    "updated_at":  "2026-04-29 17:20:49",
     "last_result":  "",
-    "notes":  "Runner v5.1 started",
+    "notes":  "Task picked",
     "worker":  "pc2",
-    "status":  "online_idle",
-    "task":  ""
+    "status":  "working",
+    "task":  "prueba-runner-v5"
 }
