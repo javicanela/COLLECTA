@@ -69,6 +69,45 @@ export interface Config {
   value: string;
 }
 
+export interface PaymentReviewCandidate {
+  id: string;
+  tipo: string;
+  descripcion?: string | null;
+  monto: number;
+  fechaVence: string;
+  estatus: OperationEstatus | string;
+  client?: Pick<Client, 'nombre' | 'rfc'> | null;
+}
+
+export interface PaymentReviewPayload {
+  event?: string;
+  receiptKey?: string;
+  status?: string;
+  clientId?: string | null;
+  operationId?: string | null;
+  rfc?: string | null;
+  amount?: number | null;
+  paymentDate?: string | null;
+  reference?: string | null;
+  source?: string | null;
+  provider?: string | null;
+  reasons?: string[];
+  rawMessage?: string;
+}
+
+export interface PaymentReviewItem {
+  id: string;
+  createdAt: string;
+  client?: Pick<Client, 'id' | 'nombre' | 'rfc' | 'telefono'> | null;
+  payload: PaymentReviewPayload;
+  candidates: PaymentReviewCandidate[];
+}
+
+export interface PaymentReviewReport {
+  total: number;
+  pending: PaymentReviewItem[];
+}
+
 // Tipos para API Responses
 export interface ApiResponse<T> {
   success: boolean;

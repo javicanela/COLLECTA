@@ -4,7 +4,7 @@ import { api } from '../services/api';
 import {
   LayoutDashboard, Users, Upload, Download,
   Settings, ScrollText, Sun, Moon, Menu, X,
-  Zap, AlertCircle, Wallet, ChevronRight, Home, Bot,
+  Zap, AlertCircle, Wallet, ChevronRight, Home, Bot, ReceiptText,
 } from 'lucide-react';
 import { useOperationStore } from '../stores/useOperationStore';
 import { useTheme } from '../hooks/useTheme';
@@ -18,6 +18,7 @@ const menuItems = [
   { id: 'dir',    label: 'Directorio',  icon: Users,           path: '/directorio' },
   { id: 'exp',    label: 'Exportar',    icon: Download,        path: '/exportar' },
   { id: 'agent',  label: 'Agente IA',   icon: Bot,             path: '/agente' },
+  { id: 'payrev', label: 'Pagos',        icon: ReceiptText,     path: '/pagos/revision' },
   { id: 'log',    label: 'Logs',        icon: ScrollText,      path: '/logs' },
   { id: 'conf',   label: 'Config',      icon: Settings,        path: '/config' },
 ];
@@ -28,6 +29,7 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/directorio': { title: 'Directorio', subtitle: 'Base de clientes del despacho' },
   '/exportar': { title: 'Exportar', subtitle: 'Exportaciones y estadísticas' },
   '/agente': { title: 'Agente IA', subtitle: 'Cobranza autónoma con IA' },
+  '/pagos/revision': { title: 'Confirmaciones de pago', subtitle: 'Revision de comprobantes ambiguos' },
   '/logs': { title: 'Logs', subtitle: 'Historial de envíos de cobranza' },
   '/config': { title: 'Configuración', subtitle: 'Configuración del sistema' },
 };
@@ -40,7 +42,7 @@ export default function MainLayout() {
 
   const [activeProvider, setActiveProvider] = useState<string | null>(null);
   const [sysMode, setSysMode] = useState<string>('PRUEBA');
-  const [waStatus, setWaStatus] = useState<'connected' | 'disconnected' | 'not_configured'>('not_configured');
+  const [waStatus, setWaStatus] = useState<'connected' | 'disconnected' | 'not_configured' | 'error'>('not_configured');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -62,9 +64,13 @@ export default function MainLayout() {
 
     // Poll WhatsApp connection status
     const pollWaStatus = () => {
-      api.get<{ configured: boolean; connected: boolean }>('/whatsapp/status')
-        .then(s => setWaStatus(s.configured ? (s.connected ? 'connected' : 'disconnected') : 'not_configured'))
-        .catch(() => setWaStatus('not_configured'));
+      api.get<{ configured: boolean; connected: boolean; state?: string }>('/whatsapp/status')
+        .then(s => {
+          if (!s.configured) setWaStatus('not_configured');
+          else if (s.state === 'error') setWaStatus('error');
+          else setWaStatus(s.connected ? 'connected' : 'disconnected');
+        })
+        .catch(() => setWaStatus('error'));
     };
     pollWaStatus();
     const waInterval = setInterval(pollWaStatus, 30000);
@@ -330,12 +336,12 @@ export default function MainLayout() {
               <span
                 className="w-2 h-2 rounded-full flex-shrink-0"
                 style={{
-                  background: waStatus === 'connected' ? '#25D366' : waStatus === 'disconnected' ? '#EF3F3F' : '#6B7280',
+                  background: waStatus === 'connected' ? '#25D366' : waStatus === 'error' ? '#F59E0B' : waStatus === 'disconnected' ? '#EF3F3F' : '#6B7280',
                   boxShadow: waStatus === 'connected' ? '0 0 6px #25D366' : 'none',
                 }}
               />
               <span>
-                WA {waStatus === 'connected' ? 'Conectado' : waStatus === 'disconnected' ? 'Desconectado' : 'No config.'}
+                WA {waStatus === 'connected' ? 'Conectado' : waStatus === 'error' ? 'Error' : waStatus === 'disconnected' ? 'Desconectado' : 'No config.'}
               </span>
             </div>
 

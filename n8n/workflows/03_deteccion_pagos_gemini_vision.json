@@ -112,12 +112,21 @@
     },
     {
       "parameters": {
-        "url": "={{$env.COLLECTA_API_URL || 'http://localhost:3001'}}/api/n8n/webhook/payment-confirmed",
+        "url": "={{$env.COLLECTA_API_URL || 'http://localhost:3001'}}/api/n8n/payment-detections",
         "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.API_KEY}}"
+            }
+          ]
+        },
         "method": "POST",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"rfc\": \"{{ $json.rfc || '' }}\",\n  \"monto\": {{ $json.paymentData.monto }},\n  \"referencia\": \"{{ $json.paymentData.referencia || '' }}\",\n  \"fechaPago\": \"{{ $json.paymentData.fecha || '' }}\"\n}",
+        "jsonBody": "={\n  \"rfc\": \"{{ $json.rfc || '' }}\",\n  \"monto\": {{ $json.paymentData.monto }},\n  \"referencia\": \"{{ $json.paymentData.referencia || '' }}\",\n  \"fechaPago\": \"{{ $json.paymentData.fecha || '' }}\",\n  \"provider\": \"gemini-vision\",\n  \"source\": \"n8n:03_deteccion_pagos_gemini_vision\",\n  \"receiptId\": \"{{ $json.paymentData.referencia || $json.clientPhone || '' }}\",\n  \"rawText\": {{ JSON.stringify($json.paymentData) }}\n}",
         "options": {
           "timeout": 10000
         }

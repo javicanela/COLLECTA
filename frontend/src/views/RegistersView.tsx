@@ -10,6 +10,7 @@ import { api } from '../services/api';
 import type { OperationEstatus } from '../types';
 import Topbar from '../components/Topbar';
 import { Card } from '../components/ui/Card';
+import { ImportWizard } from '../features/smart-import/components/ImportWizard';
 
 interface ExtractedData {
   mapping: Record<string, string>;
@@ -427,6 +428,8 @@ export default function RegistersView() {
       <Topbar title="Registros" subtitle="Importación inteligente de Excel/CSV" />
 
       <div className="p-5 max-w-7xl mx-auto w-full flex flex-col gap-6">
+
+        <ImportWizard />
 
         {/* Dropzone */}
         <div className="surface-card p-6" style={{ background: 'var(--c-surface)' }}>

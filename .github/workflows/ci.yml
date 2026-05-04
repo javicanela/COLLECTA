@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+      - chore/repo-cleanup-and-definitive-plan
+
+jobs:
+  backend:
+    name: Backend build and tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: collecta
+          POSTGRES_PASSWORD: collecta
+          POSTGRES_DB: collecta_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U collecta -d collecta_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://collecta:collecta@localhost:5432/collecta_test?schema=public
+      DIRECT_URL: postgresql://collecta:collecta@localhost:5432/collecta_test?schema=public
+      API_KEY: ci_api_key_123456789012345678901234
+      JWT_SECRET: ci_jwt_secret_123456789012345678901234567890
+      ADMIN_USER: admin
+      ADMIN_PASS: ci-admin-password
+      NODE_ENV: test
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Prepare test database
+        run: npx prisma db push --skip-generate
+
+      - name: Build backend
+        run: npm run build
+
+      - name: Test backend
+        run: npm test
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test frontend when tests exist
+        shell: bash
+        run: |
+          if find src -type f \( -name "*.test.ts" -o -name "*.test.tsx" -o -name "*.spec.ts" -o -name "*.spec.tsx" \) | grep -q .; then
+            npm test
+          else
+            echo "No frontend tests found; skipping npm test."
+          fi
+
+      - name: Build frontend
+        run: npm run build

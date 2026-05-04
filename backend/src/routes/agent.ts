@@ -1,5 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
+import {
+  AgentPlannerError,
+  approvePendingAction,
+  deriveAgentLifecycle,
+  getAgentActionPolicies,
+  planAgentExecution,
+} from '../services/agentPlanner';
 
 const router = Router();
 
@@ -45,8 +52,11 @@ router.get('/dashboard', async (_req: Request, res: Response) => {
     const today = new Date();
 
     // Current running execution (if any)
-    const currentExecution = await prisma.agentExecution.findFirst({
+    const activeExecution = await prisma.agentExecution.findFirst({
       where: { status: { in: ['RUNNING', 'PAUSED'] } },
+      orderBy: { startedAt: 'desc' },
+    });
+    const latestExecution = activeExecution || await prisma.agentExecution.findFirst({
       orderBy: { startedAt: 'desc' },
     });
 
@@ -99,20 +109,25 @@ router.get('/dashboard', async (_req: Request, res: Response) => {
       take: 20,
     });
 
-    // Determine agent status
-    let agentStatus: 'IDLE' | 'RUNNING' | 'PAUSED' | 'STOPPED' = 'IDLE';
-    if (currentExecution?.status === 'RUNNING') agentStatus = 'RUNNING';
-    else if (currentExecution?.status === 'PAUSED') agentStatus = 'PAUSED';
+    const actionPolicies = getAgentActionPolicies();
+    const policyByType = new Map(actionPolicies.map((policy) => [policy.actionType, policy]));
+    const agentStatus = deriveAgentLifecycle(activeExecution || latestExecution);
 
     res.json({
       status: agentStatus,
-      currentExecution: currentExecution
+      currentExecution: latestExecution
         ? {
-            id: currentExecution.id,
-            startedAt: currentExecution.startedAt,
-            phase: currentExecution.phase,
-            progress: currentExecution.progress,
-            triggeredBy: currentExecution.triggeredBy,
+            id: latestExecution.id,
+            startedAt: latestExecution.startedAt,
+            phase: latestExecution.phase,
+            progress: latestExecution.progress,
+            triggeredBy: latestExecution.triggeredBy,
+            status: latestExecution.status,
+            totalActions: latestExecution.totalActions,
+            completedActions: latestExecution.completedActions,
+            failedActions: latestExecution.failedActions,
+            cancelledActions: latestExecution.cancelledActions,
+            notes: latestExecution.notes,
           }
         : null,
       nextScheduledRun: nextScheduledRun(),
@@ -134,6 +149,9 @@ router.get('/dashboard', async (_req: Request, res: Response) => {
         status: a.status,
         scheduledAt: a.createdAt,
         messagePreview: a.message?.substring(0, 120),
+        approvalRequired: policyByType.get(a.type)?.approvalRequired ?? true,
+        risk: policyByType.get(a.type)?.risk ?? 'MEDIUM',
+        policyReason: policyByType.get(a.type)?.reason ?? 'Requiere aprobacion del operador',
       })),
       recentActions: recentActions.map((a) => ({
         id: a.id,
@@ -145,6 +163,7 @@ router.get('/dashboard', async (_req: Request, res: Response) => {
         sentAt: a.sentAt || a.updatedAt,
         error: a.error,
       })),
+      actionPolicies,
     });
   } catch (error) {
     console.error('[agent/dashboard]', error);
@@ -219,21 +238,31 @@ router.post('/execution/start', async (_req: Request, res: Response) => {
       });
     }
 
-    const execution = await prisma.agentExecution.create({
-      data: {
-        status: 'RUNNING',
-        phase: 'COLLECT',
-        progress: 0,
-        triggeredBy: 'MANUAL',
-        tenantId: 'default',
-      },
+    const result = await planAgentExecution({
+      prisma,
+      triggeredBy: 'MANUAL',
+      tenantId: 'default',
     });
 
     res.status(201).json({
-      message: 'Ejecución iniciada',
-      execution: { id: execution.id, status: execution.status, startedAt: execution.startedAt },
+      message: result.planned > 0
+        ? `Ejecucion planificada con ${result.planned} accion(es) pendientes de aprobacion`
+        : 'Ejecucion completada sin acciones nuevas',
+      execution: {
+        id: result.execution.id,
+        status: result.planned > 0 ? 'RUNNING' : 'COMPLETED',
+      },
+      summary: {
+        planned: result.planned,
+        approvalRequired: result.approvalRequired,
+        automatic: result.automatic,
+        skippedDuplicates: result.skippedDuplicates,
+        skippedRateLimit: result.skippedRateLimit,
+      },
+      actionPolicies: result.policies,
     });
   } catch (error) {
+    console.error('[agent/start]', error);
     res.status(500).json({ error: 'Error starting execution' });
   }
 });
@@ -249,9 +278,9 @@ router.post('/execution/stop', async (_req: Request, res: Response) => {
       return res.status(404).json({ error: 'No hay ejecución activa para detener' });
     }
 
-    // Cancel all pending actions in this execution
-    await prisma.agentAction.updateMany({
-      where: { executionId: execution.id, status: 'PENDING' },
+    // Cancel queued and handoff-ready actions in this execution.
+    const cancelled = await prisma.agentAction.updateMany({
+      where: { executionId: execution.id, status: { in: ['PENDING', 'EXECUTING'] } },
       data: { status: 'CANCELLED' },
     });
 
@@ -260,7 +289,8 @@ router.post('/execution/stop', async (_req: Request, res: Response) => {
       data: {
         status: 'STOPPED',
         completedAt: new Date(),
-        notes: 'Detenido manualmente por el operador',
+        cancelledActions: { increment: cancelled.count },
+        notes: `Detenido manualmente por el operador. ${cancelled.count} accion(es) cancelada(s).`,
       },
     });
 
@@ -336,13 +366,25 @@ router.post('/actions/cancel/:id', async (req: Request, res: Response) => {
     if (!action) {
       return res.status(404).json({ error: 'Acción no encontrada' });
     }
-    if (action.status !== 'PENDING') {
+    if (!['PENDING', 'EXECUTING'].includes(action.status)) {
       return res.status(400).json({ error: `No se puede cancelar una acción en estado ${action.status}` });
     }
 
     const updated = await prisma.agentAction.update({
       where: { id },
-      data: { status: 'CANCELLED' },
+      data: { status: 'CANCELLED', error: 'Cancelada por el operador' },
+    });
+
+    await prisma.logEntry.create({
+      data: {
+        clientId: action.clientId || null,
+        tipo: 'AGENT_ACTION_CANCELLED',
+        variante: action.type,
+        resultado: 'CANCELLED',
+        mensaje: `Accion ${id} cancelada por el operador`,
+        telefono: action.phone || null,
+        modo: 'CONTROLLED_OPERATOR',
+      },
     });
 
     res.json({ message: 'Acción cancelada', action: { id: updated.id, status: updated.status } });
@@ -355,8 +397,8 @@ router.post('/actions/cancel/:id', async (req: Request, res: Response) => {
 router.post('/actions/cancel-all', async (_req: Request, res: Response) => {
   try {
     const result = await prisma.agentAction.updateMany({
-      where: { status: 'PENDING' },
-      data: { status: 'CANCELLED' },
+      where: { status: { in: ['PENDING', 'EXECUTING'] } },
+      data: { status: 'CANCELLED', error: 'Cancelada por el operador' },
     });
     res.json({ message: `${result.count} acciones canceladas`, count: result.count });
   } catch (error) {
@@ -368,22 +410,22 @@ router.post('/actions/cancel-all', async (_req: Request, res: Response) => {
 router.post('/actions/approve/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params as { id: string };
-    const action = await prisma.agentAction.findUnique({ where: { id } });
-    if (!action) {
-      return res.status(404).json({ error: 'Acción no encontrada' });
-    }
-    if (action.status !== 'PENDING') {
-      return res.status(400).json({ error: `Acción ya está en estado ${action.status}` });
-    }
-
-    // Mark as EXECUTING (n8n will pick it up and mark COMPLETED)
-    const updated = await prisma.agentAction.update({
-      where: { id },
-      data: { status: 'EXECUTING' },
+    const user = (req as any).user;
+    const updated = await approvePendingAction({
+      prisma,
+      actionId: id,
+      tenantId: 'default',
+      approvedBy: user?.email || user?.userId || 'operator',
     });
 
-    res.json({ message: 'Acción aprobada', action: { id: updated.id, status: updated.status } });
+    res.json({
+      message: 'Accion aprobada para handoff controlado; no se envio directamente',
+      action: { id: updated.id, status: updated.status },
+    });
   } catch (error) {
+    if (error instanceof AgentPlannerError) {
+      return res.status(error.httpStatus).json({ error: error.message, code: error.code });
+    }
     res.status(500).json({ error: 'Error approving action' });
   }
 });

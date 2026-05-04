@@ -7,6 +7,7 @@ const router = Router();
 
 const WEBHOOK_SECRET = process.env.EVOLUTION_WEBHOOK_SECRET || '';
 const PAYMENT_DETECTION_WEBHOOK_URL = process.env.PAYMENT_DETECTION_WEBHOOK_URL || '';
+const PAYMENT_DETECTION_WEBHOOK_TOKEN = process.env.PAYMENT_DETECTION_WEBHOOK_TOKEN || '';
 
 function verifyWebhookSecret(req: Request, res: Response, next: import('express').NextFunction) {
   if (!WEBHOOK_SECRET) {
@@ -102,18 +103,25 @@ router.post('/evolution', verifyWebhookSecret, async (req: Request, res: Respons
       },
     });
 
-    // If it's an image and we have a payment detection webhook, forward it
-    if (messageType === 'IMAGE' && PAYMENT_DETECTION_WEBHOOK_URL && mediaUrl) {
+    // Forward receipt-like messages to the provider-agnostic payment flow.
+    if (PAYMENT_DETECTION_WEBHOOK_URL && (mediaUrl || content)) {
       try {
         await axios.post(PAYMENT_DETECTION_WEBHOOK_URL, {
           phone,
           clientId: client?.id || null,
           clientRfc: client?.rfc || null,
           clientName: client?.nombre || null,
+          messageType,
           mediaUrl,
+          text: content,
           caption: content,
           messageId: message.key?.id,
-        }, { timeout: 10000 });
+        }, {
+          timeout: 10000,
+          headers: PAYMENT_DETECTION_WEBHOOK_TOKEN
+            ? { Authorization: `Bearer ${PAYMENT_DETECTION_WEBHOOK_TOKEN}` }
+            : undefined,
+        });
       } catch {
         // Payment detection is best-effort; don't fail the webhook
       }

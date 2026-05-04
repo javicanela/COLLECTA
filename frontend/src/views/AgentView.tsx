@@ -6,6 +6,7 @@ import {
   CheckCircle2, XCircle, Clock, AlertTriangle,
   TrendingDown, Users, DollarSign, CalendarClock,
   ChevronDown, ChevronUp, Ban, CheckCheck, Eye,
+  ShieldCheck, ClipboardList, History, Send,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────
@@ -29,6 +30,9 @@ interface PendingAction {
   status: string;
   scheduledAt: string;
   messagePreview?: string;
+  approvalRequired: boolean;
+  risk: 'LOW' | 'MEDIUM' | 'HIGH';
+  policyReason?: string;
 }
 
 interface RecentAction {
@@ -49,15 +53,30 @@ interface ExecutionSummary {
   progress: number;
   startedAt: string;
   triggeredBy: string;
+  totalActions?: number;
+  completedActions?: number;
+  failedActions?: number;
+  cancelledActions?: number;
+  notes?: string;
+}
+
+interface ActionPolicy {
+  actionType: string;
+  automatic: boolean;
+  approvalRequired: boolean;
+  risk: 'LOW' | 'MEDIUM' | 'HIGH';
+  channel: 'INTERNAL' | 'WHATSAPP' | 'EMAIL';
+  reason: string;
 }
 
 interface Dashboard {
-  status: 'IDLE' | 'RUNNING' | 'PAUSED' | 'STOPPED';
+  status: 'IDLE' | 'RUNNING' | 'PAUSED' | 'STOPPED' | 'FAILED' | 'COMPLETED';
   currentExecution: ExecutionSummary | null;
   nextScheduledRun: string;
   stats: AgentStats;
   pendingActions: PendingAction[];
   recentActions: RecentAction[];
+  actionPolicies: ActionPolicy[];
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -73,6 +92,8 @@ const STATUS_CONFIG = {
   RUNNING: { label: 'Ejecutando',  color: '#10B981', glow: 'rgba(16,185,129,0.4)',  pulse: true  },
   PAUSED:  { label: 'Pausado',     color: '#F59E0B', glow: 'rgba(245,158,11,0.4)',  pulse: false },
   STOPPED: { label: 'Detenido',    color: '#EF4444', glow: 'rgba(239,68,68,0.3)',   pulse: false },
+  FAILED:  { label: 'Fallido',     color: '#DC2626', glow: 'rgba(220,38,38,0.3)',   pulse: false },
+  COMPLETED: { label: 'Completado', color: '#14B8A6', glow: 'rgba(20,184,166,0.3)', pulse: false },
 } as const;
 
 const ACTION_LABELS: Record<string, string> = {
@@ -154,6 +175,19 @@ export default function AgentView() {
     }
   };
 
+  const approveAction = async (id: string) => {
+    setActionLoading(`approve-${id}`);
+    try {
+      await api.post(`/agent/actions/approve/${id}`);
+      showToast('Accion aprobada para handoff controlado');
+      await load();
+    } catch (e: any) {
+      showToast(e.message || 'Error aprobando accion', 'err');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const cancelSelected = async () => {
     if (selected.size === 0) return;
     setActionLoading('cancel-sel');
@@ -201,7 +235,11 @@ export default function AgentView() {
   const sc = STATUS_CONFIG[dashboard.status] ?? STATUS_CONFIG.IDLE;
   const isRunning = dashboard.status === 'RUNNING';
   const isPaused  = dashboard.status === 'PAUSED';
-  const isIdle    = dashboard.status === 'IDLE' || dashboard.status === 'STOPPED';
+  const isIdle    = ['IDLE', 'STOPPED', 'COMPLETED', 'FAILED'].includes(dashboard.status);
+  const failedActions = dashboard.recentActions.filter(a => a.status === 'FAILED');
+  const actionPolicies = dashboard.actionPolicies ?? [];
+  const approvalPolicies = actionPolicies.filter(p => p.approvalRequired);
+  const automaticPolicies = actionPolicies.filter(p => p.automatic);
 
   return (
     <div className="space-y-6 pb-10">
@@ -327,9 +365,27 @@ export default function AgentView() {
         <TrendingDown size={16} className="text-purple-400" />
       </div>
 
+      <Section
+        title="Automatico vs aprobacion"
+        extra={<ClipboardList size={15} className="text-white/35" />}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <PolicyColumn
+            title={`Requiere aprobacion (${approvalPolicies.length})`}
+            tone="#F59E0B"
+            policies={approvalPolicies}
+          />
+          <PolicyColumn
+            title={`Automatico (${automaticPolicies.length})`}
+            tone="#14B8A6"
+            policies={automaticPolicies}
+          />
+        </div>
+      </Section>
+
       {/* ── Pending Actions ───────────────────────────── */}
       <Section
-        title={`Acciones pendientes (${dashboard.pendingActions.length})`}
+        title={`Cola de aprobacion (${dashboard.pendingActions.length})`}
         extra={dashboard.pendingActions.length > 0 ? (
           <div className="flex gap-2">
             {selected.size > 0 && (
@@ -360,12 +416,28 @@ export default function AgentView() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-white font-medium text-sm truncate">{a.clientName}</span>
                     <ActionBadge type={a.action} />
+                    <RiskBadge risk={a.risk} />
+                    {a.approvalRequired && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/35 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
+                        <ShieldCheck size={10} />
+                        Aprobacion
+                      </span>
+                    )}
                   </div>
                   {a.messagePreview && (
                     <p className="text-white/40 text-xs mt-0.5 truncate">{a.messagePreview}</p>
                   )}
-                  <p className="text-white/30 text-[11px] mt-0.5">{fDate(a.scheduledAt)}</p>
+                  <p className="text-white/30 text-[11px] mt-0.5">
+                    {fDate(a.scheduledAt)}
+                    {a.policyReason ? ` · ${a.policyReason}` : ''}
+                  </p>
                 </div>
+                <button onClick={e => { e.stopPropagation(); approveAction(a.id); }}
+                  disabled={actionLoading === `approve-${a.id}`}
+                  className="p-1.5 rounded-lg text-white/40 hover:text-emerald-300 hover:bg-emerald-500/10 transition-all flex-shrink-0"
+                  title="Aprobar">
+                  {actionLoading === `approve-${a.id}` ? <RefreshCw size={13} className="animate-spin" /> : <Send size={13} />}
+                </button>
                 <button onClick={e => { e.stopPropagation(); cancelAction(a.id); }}
                   disabled={actionLoading === a.id}
                   className="p-1.5 rounded-lg text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-all flex-shrink-0"
@@ -373,6 +445,29 @@ export default function AgentView() {
                   {actionLoading === a.id ? <RefreshCw size={13} className="animate-spin" /> : <XCircle size={13} />}
                 </button>
               </motion.div>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      <Section
+        title={`Fallos (${failedActions.length})`}
+        extra={<AlertTriangle size={15} className={failedActions.length > 0 ? 'text-red-400' : 'text-white/25'} />}
+      >
+        {failedActions.length === 0 ? (
+          <EmptyState icon={<CheckCircle2 size={32} className="text-white/20" />} text="Sin fallos registrados" />
+        ) : (
+          <div className="space-y-1.5">
+            {failedActions.map(a => (
+              <div key={a.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-red-400/15"
+                style={{ background: 'rgba(239,68,68,0.06)' }}>
+                <StatusDot status={a.status} />
+                <span className="text-white text-sm font-medium flex-1 truncate">{a.clientName}</span>
+                <ActionBadge type={a.action} small />
+                <span className="text-red-300 text-[11px] truncate max-w-[220px]" title={a.error || 'Sin detalle'}>
+                  {a.error || 'Sin detalle'}
+                </span>
+              </div>
             ))}
           </div>
         )}
@@ -402,11 +497,14 @@ export default function AgentView() {
       <Section
         title="Historial de ejecuciones"
         extra={
-          <button onClick={loadHistory} disabled={historyLoading}
-            className="flex items-center gap-1.5 text-xs text-purple-400 hover:text-purple-300 transition-colors">
-            {historyLoading ? <RefreshCw size={12} className="animate-spin" /> : <Eye size={12} />}
-            Cargar historial
-          </button>
+          <div className="flex items-center gap-2">
+            <History size={13} className="text-white/25" />
+            <button onClick={loadHistory} disabled={historyLoading}
+              className="flex items-center gap-1.5 text-xs text-purple-400 hover:text-purple-300 transition-colors">
+              {historyLoading ? <RefreshCw size={12} className="animate-spin" /> : <Eye size={12} />}
+              Cargar historial
+            </button>
+          </div>
         }
       >
         {history.length === 0 ? (
@@ -529,6 +627,48 @@ function ActionBadge({ type, small }: { type: string; small?: boolean }) {
       style={{ background: c + '22', color: c, border: `1px solid ${c}44` }}>
       {ACTION_LABELS[type] || type}
     </span>
+  );
+}
+
+function RiskBadge({ risk }: { risk: 'LOW' | 'MEDIUM' | 'HIGH' }) {
+  const config = {
+    LOW: { label: 'Bajo', color: '#14B8A6' },
+    MEDIUM: { label: 'Medio', color: '#F59E0B' },
+    HIGH: { label: 'Alto', color: '#EF4444' },
+  }[risk];
+
+  return (
+    <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+      style={{ background: config.color + '1F', color: config.color, border: `1px solid ${config.color}44` }}>
+      Riesgo {config.label}
+    </span>
+  );
+}
+
+function PolicyColumn({ title, tone, policies }: { title: string; tone: string; policies: ActionPolicy[] }) {
+  return (
+    <div className="rounded-xl border border-white/10 p-3"
+      style={{ background: 'rgba(255,255,255,0.025)' }}>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="w-2 h-2 rounded-full" style={{ background: tone }} />
+        <p className="text-white/75 text-xs font-semibold uppercase tracking-wider">{title}</p>
+      </div>
+      {policies.length === 0 ? (
+        <p className="text-white/30 text-xs py-3">Sin acciones en esta categoria</p>
+      ) : (
+        <div className="space-y-2">
+          {policies.map(policy => (
+            <div key={policy.actionType} className="flex items-start gap-2">
+              <ActionBadge type={policy.actionType} small />
+              <div className="min-w-0">
+                <p className="text-white/65 text-xs">{policy.channel}</p>
+                <p className="text-white/35 text-[11px] leading-snug">{policy.reason}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

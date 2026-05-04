@@ -22,6 +22,15 @@
       "parameters": {
         "url": "={{$env.COLLECTA_API_URL || 'http://localhost:3001'}}/api/n8n/daily-report",
         "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.API_KEY}}"
+            }
+          ]
+        },
         "options": {
           "timeout": 15000
         }
@@ -174,6 +183,15 @@
       "parameters": {
         "url": "={{$env.COLLECTA_API_URL || 'http://localhost:3001'}}/api/logs",
         "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.API_KEY}}"
+            }
+          ]
+        },
         "method": "POST",
         "sendBody": true,
         "bodyParameters": {

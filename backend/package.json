@@ -10,7 +10,8 @@
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:whatsapp": "vitest run --config vitest.whatsapp.config.ts src/__tests__/whatsapp.test.ts"
   },
   "keywords": [],
   "author": "",

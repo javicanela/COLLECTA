@@ -1,7 +1,86 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
+import { z } from 'zod';
+import {
+  detectPaymentFromEvidence,
+  PAYMENT_DETECTION_LOG_TYPE,
+  type PaymentDetectionResult,
+} from '../services/paymentDetection';
 
 const router = Router();
+
+const paymentEvidenceSchema = z.object({
+  rfc: z.string().optional().nullable(),
+  monto: z.union([z.number(), z.string()]).optional().nullable(),
+  amount: z.union([z.number(), z.string()]).optional().nullable(),
+  referencia: z.string().optional().nullable(),
+  reference: z.string().optional().nullable(),
+  fechaPago: z.string().optional().nullable(),
+  paymentDate: z.string().optional().nullable(),
+  receiptId: z.string().optional().nullable(),
+  sourceMessageId: z.string().optional().nullable(),
+  provider: z.string().optional().nullable(),
+  source: z.string().optional().nullable(),
+  rawText: z.string().optional().nullable(),
+  mediaUrl: z.string().optional().nullable(),
+});
+
+const manualConfirmSchema = z.object({
+  operationId: z.string().min(1),
+  paymentDate: z.string().optional().nullable(),
+  reference: z.string().optional().nullable(),
+  receiptId: z.string().optional().nullable(),
+});
+
+function toPaymentResponse(result: PaymentDetectionResult) {
+  const matched = result.status === 'ACCEPTED' || result.status === 'DUPLICATE';
+  const reviewRequired = result.status === 'REVIEW_REQUIRED';
+
+  return {
+    matched,
+    reviewRequired,
+    status: result.status,
+    message: result.reasons.join(', '),
+    reasons: result.reasons,
+    operationId: result.operationId || null,
+    clientId: null,
+    candidates: [],
+  };
+}
+
+function normalizePaymentEvidence(
+  body: z.infer<typeof paymentEvidenceSchema>,
+  defaultSource: string,
+) {
+  const amountValue = body.amount ?? body.monto;
+  const amount = typeof amountValue === 'string' ? Number(amountValue) : amountValue;
+
+  if (!body.rfc || amount == null || Number.isNaN(amount)) {
+    return null;
+  }
+
+  return {
+    rfc: body.rfc,
+    amount,
+    paymentDate: body.paymentDate ?? body.fechaPago ?? undefined,
+    reference: body.reference ?? body.referencia ?? undefined,
+    receiptId: body.receiptId ?? undefined,
+    sourceMessageId: body.sourceMessageId ?? undefined,
+    provider: body.provider ?? undefined,
+    source: body.source ?? defaultSource,
+    rawText: body.rawText ?? undefined,
+    mediaUrl: body.mediaUrl ?? undefined,
+  };
+}
+
+function parseDetectionPayload(message?: string | null) {
+  if (!message) return {};
+  try {
+    return JSON.parse(message);
+  } catch {
+    return { rawMessage: message };
+  }
+}
 
 /**
  * GET /api/n8n/daily-report
@@ -193,82 +272,193 @@ router.get('/daily-report', async (_req: Request, res: Response) => {
  */
 router.post('/webhook/payment-confirmed', async (req: Request, res: Response) => {
   try {
-    const { rfc, monto, referencia, fechaPago } = req.body;
-
-    if (!rfc || monto === undefined) {
-      return res.status(400).json({ error: 'rfc y monto son requeridos' });
-    }
-
-    // Find client by RFC
-    const client = await prisma.client.findUnique({
-      where: { rfc: rfc.toUpperCase() },
-    });
-
-    if (!client) {
-      return res.status(404).json({ error: `Cliente con RFC ${rfc} no encontrado`, matched: false });
-    }
-
-    // Find pending operations that match the amount (±$0.50 tolerance)
-    const pendingOps = await prisma.operation.findMany({
-      where: {
-        clientId: client.id,
-        fechaPago: null,
-        excluir: false,
-        archived: false,
-      },
-      orderBy: { fechaVence: 'asc' },
-    });
-
-    const tolerance = 0.50;
-    const matchedOp = pendingOps.find(op => Math.abs(op.monto - monto) <= tolerance);
-
-    if (!matchedOp) {
-      return res.json({
-        matched: false,
-        message: `No se encontró operación pendiente para ${client.nombre} (RFC: ${rfc}) con monto ~${monto}`,
-        pendingOps: pendingOps.map(op => ({
-          id: op.id,
-          tipo: op.tipo,
-          monto: op.monto,
-          fechaVence: op.fechaVence,
-        })),
+    const parsed = paymentEvidenceSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: parsed.error.issues.map(i => ({ field: i.path.join('.'), message: i.message })),
       });
     }
 
-    // Mark as paid
-    const pagoDate = fechaPago ? new Date(fechaPago) : new Date();
-    const updated = await prisma.operation.update({
-      where: { id: matchedOp.id },
-      data: { fechaPago: pagoDate, estatus: 'PAGADO' },
+    const body = parsed.data;
+    const evidence = normalizePaymentEvidence(body, 'n8n:webhook/payment-confirmed');
+    if (!evidence) {
+      return res.status(400).json({ error: 'rfc y monto son requeridos' });
+    }
+
+    const result = await detectPaymentFromEvidence(prisma, evidence);
+
+    res.json(toPaymentResponse(result));
+  } catch (error) {
+    console.error('Error processing payment webhook:', error);
+    res.status(500).json({ error: 'Error processing payment webhook' });
+  }
+});
+
+/**
+ * POST /api/n8n/payment-detections
+ * Provider-agnostic entrypoint for OCR/vision/message extractors.
+ */
+router.post('/payment-detections', async (req: Request, res: Response) => {
+  try {
+    const parsed = paymentEvidenceSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: parsed.error.issues.map(i => ({ field: i.path.join('.'), message: i.message })),
+      });
+    }
+
+    const body = parsed.data;
+    const evidence = normalizePaymentEvidence(body, 'n8n:payment-detections');
+    if (!evidence) {
+      return res.status(400).json({ error: 'rfc y monto son requeridos' });
+    }
+
+    const result = await detectPaymentFromEvidence(prisma, evidence);
+
+    res.json(toPaymentResponse(result));
+  } catch (error) {
+    console.error('Error detecting payment:', error);
+    res.status(500).json({ error: 'Error detecting payment' });
+  }
+});
+
+/**
+ * GET /api/n8n/payment-review
+ * Report for detections that require manual confirmation.
+ */
+router.get('/payment-review', async (_req: Request, res: Response) => {
+  try {
+    const logs = await prisma.logEntry.findMany({
+      where: {
+        tipo: PAYMENT_DETECTION_LOG_TYPE,
+        resultado: 'REVIEW_REQUIRED',
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        client: {
+          select: { id: true, nombre: true, rfc: true, telefono: true },
+        },
+      },
+      take: 100,
+    });
+
+    const pending = await Promise.all(logs.map(async log => {
+      const payload = parseDetectionPayload(log.mensaje) as any;
+      const clientId = payload.clientId || log.clientId;
+      const candidates = clientId
+        ? await prisma.operation.findMany({
+          where: {
+            clientId,
+            fechaPago: null,
+            excluir: false,
+            archived: false,
+            estatus: { not: 'PAGADO' },
+          },
+          include: { client: true },
+          orderBy: { fechaVence: 'asc' },
+          take: 10,
+        })
+        : [];
+
+      return {
+        id: log.id,
+        createdAt: log.createdAt,
+        client: log.client,
+        payload,
+        candidates: candidates.map(op => ({
+          id: op.id,
+          tipo: op.tipo,
+          descripcion: op.descripcion,
+          monto: op.monto,
+          fechaVence: op.fechaVence,
+          estatus: op.estatus,
+          client: op.client ? { nombre: op.client.nombre, rfc: op.client.rfc } : null,
+        })),
+      };
+    }));
+
+    res.json({
+      total: logs.length,
+      pending,
+    });
+  } catch (error) {
+    console.error('Error fetching payment review report:', error);
+    res.status(500).json({ error: 'Error fetching payment review report' });
+  }
+});
+
+/**
+ * POST /api/n8n/payment-review/confirm
+ * Manual confirmation path for ambiguous receipts.
+ */
+router.post('/payment-review/confirm', async (req: Request, res: Response) => {
+  try {
+    const parsed = manualConfirmSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: parsed.error.issues.map(i => ({ field: i.path.join('.'), message: i.message })),
+      });
+    }
+
+    const operation = await prisma.operation.findUnique({
+      where: { id: parsed.data.operationId },
       include: { client: true },
     });
 
-    // Create log entry
+    if (!operation) {
+      return res.status(404).json({ error: 'Operation not found' });
+    }
+    if (operation.fechaPago || operation.estatus === 'PAGADO') {
+      return res.status(409).json({ error: 'Operation already paid' });
+    }
+
+    const paymentDate = parsed.data.paymentDate
+      ? new Date(`${parsed.data.paymentDate}T00:00:00.000Z`)
+      : new Date();
+
+    const updated = await prisma.operation.update({
+      where: { id: operation.id },
+      data: { fechaPago: paymentDate, estatus: 'PAGADO' },
+      include: { client: true },
+    });
+
     await prisma.logEntry.create({
       data: {
-        clientId: client.id,
-        tipo: 'PAGO_AUTOMATICO',
-        variante: 'N8N_WEBHOOK',
-        resultado: 'CONFIRMADO',
-        mensaje: `Pago detectado automáticamente. Monto: $${monto}, Ref: ${referencia || 'N/A'}`,
-        telefono: (client as any).telefono || '',
-        modo: 'PRODUCCIÓN',
+        clientId: operation.clientId,
+        tipo: PAYMENT_DETECTION_LOG_TYPE,
+        variante: 'MANUAL_REVIEW',
+        resultado: 'MANUALLY_CONFIRMED',
+        mensaje: JSON.stringify({
+          event: 'payment_detection_manual_confirmation',
+          operationId: operation.id,
+          receiptId: parsed.data.receiptId || null,
+          reference: parsed.data.reference || null,
+          paymentDate: paymentDate.toISOString().slice(0, 10),
+          reasons: ['manual_confirmation'],
+        }),
+        telefono: operation.client?.telefono || null,
+        modo: 'PRODUCCION',
       },
     });
 
     res.json({
       matched: true,
-      message: `Pago registrado para ${client.nombre}: ${matchedOp.tipo} — $${monto}`,
+      reviewRequired: false,
+      status: 'MANUALLY_CONFIRMED',
       operation: {
         id: updated.id,
         tipo: updated.tipo,
         monto: updated.monto,
         fechaPago: updated.fechaPago,
+        estatus: updated.estatus,
       },
     });
   } catch (error) {
-    console.error('Error processing payment webhook:', error);
-    res.status(500).json({ error: 'Error processing payment webhook' });
+    console.error('Error confirming payment review:', error);
+    res.status(500).json({ error: 'Error confirming payment review' });
   }
 });
 

@@ -2,9 +2,6 @@ import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import * as jwt from 'jsonwebtoken';
 
-const API_KEY = process.env.API_KEY;
-const JWT_SECRET = process.env.JWT_SECRET;
-
 function timingSafeEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
   const bufB = Buffer.from(b);
@@ -15,6 +12,8 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const API_KEY = process.env.API_KEY;
+  const JWT_SECRET = process.env.JWT_SECRET;
   const requestId = crypto.randomUUID();
   res.setHeader('X-Request-ID', requestId);
 
