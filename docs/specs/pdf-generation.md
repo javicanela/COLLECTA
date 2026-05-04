@@ -1,38 +1,54 @@
----
-name: pdf_generation_flow
-description: Instrucciones sobre cómo generar reportes financieros en PDF desde el frontend de forma modular.
----
+# PDF Generation Spec
 
-# Generación de PDFs
+## Decision
 
-Para solventar las limitaciones pasadas de `jsPDF` crudo (posicionamiento x,y manual), el proyecto migrará a generadores basados en componentes declarativos de React.
+Collecta mantiene dos rutas de PDF:
 
-## Librería Principal
-Se usará `@react-pdf/renderer` para definir los documentos.
+- Frontend PDF con `@react-pdf/renderer` para preview, descarga y reportes desde
+  la web.
+- Backend PDF con `pdfkit` para endpoints server-side usados por n8n/email.
 
-## Estructura de un Documento
-Cada formato de impresión (ej. "Recibo de Honorarios", "Reporte Mensual") debe ser un componente aislado dentro de `frontend/src/pdf-templates/`.
+Ninguna ruta reemplaza a la otra en esta fase.
 
-### Reglas de Diseño PDF:
-1. **No usar HTML Estándar:** Usar exclusivamente los componentes primitivos provistos por `@react-pdf/renderer` (`<Document>`, `<Page>`, `<View>`, `<Text>`, `<Image>`).
-2. **Estilos Aislados:** Usar `StyleSheet.create` de la misma librería. Las utilidades de Tailwind **no aplican** mágicamente dentro del lienzo del PDF.
-3. **Paso de Datos (Props):** Los componentes PDF deben recibir constructivamente la data cruda, ej: `<ReciboFiscal cliente={selectedClient} operaciones={listaOp} />`.
+## Frontend
 
-### Generación y Descarga (Web)
-Para mostrar botones de "Descargar PDF" o "Previsualizar":
-```tsx
-import { PDFDownloadLink } from '@react-pdf/renderer';
-import MiReportePDF from './pdf-templates/MiReportePDF';
+Componentes y servicios vigentes:
 
-const BotonDescarga = ({ data }) => (
-  <PDFDownloadLink document={<MiReportePDF data={data} />} fileName="reporte.pdf">
-    {({ blob, url, loading, error }) =>
-      loading ? 'Preparando documento...' : 'Descargar Reporte'
-    }
-  </PDFDownloadLink>
-);
-```
+- `frontend/src/services/pdfService.tsx`
+- `frontend/src/components/pdf/`
+- `frontend/src/pdf-templates/`
+- `frontend/src/views/ConfigView.tsx`
+- `frontend/src/views/ExportView.tsx`
+- `frontend/src/views/DashboardView.tsx`
 
-### Integración con WhatsApp (Generación en Memoria)
-Cuando se necesite generar el PDF sin descargarlo (para copiarlo al portapapeles según `whatsapp_flow.md`):
-Usar la API `pdf()` de React-PDF para convertir el componente en un Blob de manera programática.
+Reglas:
+
+- Usar primitivas de `@react-pdf/renderer`.
+- No asumir Tailwind dentro del PDF.
+- Preview y descarga deben quedar en la web.
+
+## Backend
+
+Endpoint vigente:
+
+- `GET /api/cobranza/cliente/:rfc/pdf`
+
+Archivo:
+
+- `backend/src/routes/cobranza.ts`
+
+Reglas:
+
+- La ruta esta protegida por `requireAuth` desde `backend/src/index.ts`.
+- n8n debe llamar con `Authorization: Bearer <API_KEY>`.
+
+## WhatsApp
+
+Enviar PDF por WhatsApp todavia esta pendiente. Opciones futuras:
+
+- Evolution API `send-media` si self-host es viable.
+- Email con PDF como flujo alterno.
+- Fallback manual si no hay WhatsApp programatico.
+
+No usar `wa.me` como envio automatico de adjuntos; solo sirve para abrir chat con
+texto precargado.

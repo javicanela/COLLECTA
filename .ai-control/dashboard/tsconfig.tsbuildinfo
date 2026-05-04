@@ -1,1 +1,0 @@
-{"root":["./src/app.tsx","./src/api.ts","./src/main.tsx","./src/types.ts","./src/components/commandbar.tsx","./src/components/logviewer.tsx","./src/components/newtaskform.tsx","./src/components/statuspanel.tsx","./src/components/taskqueue.tsx"],"version":"5.9.3"}

@@ -45,6 +45,18 @@ coverage/
 # Playwright MCP artifacts (session logs + snapshots)
 .playwright-mcp/
 
+# Local AI agent state (not part of Collecta product)
+.ai-control/
+.ai-tasks/
+.ai-logs/
+.ai-status/
+.ai-approvals/
+.ai-*/
+.claude/
+
+# TypeScript incremental build artifacts
+*.tsbuildinfo
+
 # External reference clones (not part of Collecta)
 n8n/templates/
 

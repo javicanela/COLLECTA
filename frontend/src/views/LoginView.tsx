@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { Lock as LockIcon, User as UserIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
 
 export default function LoginView() {
