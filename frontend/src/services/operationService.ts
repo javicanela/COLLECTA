@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { Operation } from '../types';
+import type { Operation, StatementDeliveryResult } from '../types';
 
 export const OperationService = {
   getAll: (filters?: any) => {
@@ -17,6 +17,8 @@ export const OperationService = {
   archive: (id: string) => api.patch<Operation>(`/operations/${id}/archive`, {}),
   unarchive: (id: string) => api.patch<Operation>(`/operations/${id}/unarchive`, {}),
   toggleExclude: (id: string) => api.patch<Operation>(`/operations/${id}/toggle-exclude`, {}),
+  sendStatement: (id: string, channelPreference: 'WHATSAPP' | 'EMAIL' | 'AUTO' = 'AUTO') =>
+    api.post<StatementDeliveryResult>(`/cobranza/operation/${id}/send-statement`, { channelPreference }),
   
   extract: (data: { headers: string[], rows: any[][], provider?: string }) => 
     api.post<{ mapping: any, _source: string }>('/extract', data),

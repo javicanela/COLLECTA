@@ -51,6 +51,17 @@ export interface Operation {
   updatedAt?: string;
 }
 
+export interface StatementDeliveryResult {
+  success: boolean;
+  channel: 'WHATSAPP' | 'EMAIL' | 'MANUAL_FALLBACK';
+  clientId: string;
+  mediaUrl?: string;
+  messageId?: string;
+  emailMessageId?: string;
+  fallbackWaUrl?: string;
+  error?: string;
+}
+
 export interface LogEntry {
   id: string;
   clientId?: string | null;

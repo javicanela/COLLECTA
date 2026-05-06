@@ -10,6 +10,7 @@ import { CheckCircle2, MessageCircle, FileText, Ban, Archive, Trash2, RotateCcw,
 import NewOperationModal from '../components/modals/NewOperationModal';
 import MasivoWAModal from '../components/modals/MasivoWAModal';
 import { api } from '../services/api';
+import { OperationService } from '../services/operationService';
 import { LogService } from '../services/logService';
 import { buildWaUrl, reemplazarVariables, DEFAULT_MSG_VENCIDO, DEFAULT_MSG_HOY, DEFAULT_MSG_RECORDATORIO } from '../utils/whatsapp';
 import { PdfService } from '../services/pdfService';
@@ -51,6 +52,7 @@ export default function DashboardView() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isGeneratingMasivoPDF, setIsGeneratingMasivoPDF] = useState(false);
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
+  const [sendingStatementIds, setSendingStatementIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchOperations();
@@ -178,6 +180,36 @@ export default function DashboardView() {
       if (e.message !== 'Cancelled') {
         toast('err', 'Error al generar PDF');
       }
+    }
+  };
+
+  const handleSendStatement = async (op: typeof operations[0]) => {
+    if (sendingStatementIds.has(op.id)) return;
+
+    setSendingStatementIds(prev => new Set(prev).add(op.id));
+    try {
+      const result = await OperationService.sendStatement(op.id, 'AUTO');
+
+      if (result.channel === 'WHATSAPP' && result.success) {
+        toast('ok', 'Estado de cuenta enviado por WhatsApp');
+      } else if (result.channel === 'EMAIL' && result.success) {
+        toast('ok', 'Estado de cuenta enviado por email');
+      } else if (result.channel === 'MANUAL_FALLBACK') {
+        toast('warn', 'Canales automaticos no disponibles. Se abrio fallback manual.');
+        if (result.fallbackWaUrl) {
+          window.open(result.fallbackWaUrl, '_blank');
+        } else if (result.mediaUrl) {
+          window.open(result.mediaUrl, '_blank');
+        }
+      }
+    } catch (error: any) {
+      toast('err', error?.message || 'Error al enviar estado de cuenta');
+    } finally {
+      setSendingStatementIds(prev => {
+        const next = new Set(prev);
+        next.delete(op.id);
+        return next;
+      });
     }
   };
 
@@ -656,6 +688,16 @@ export default function DashboardView() {
                               onClick={() => handleGeneratePDF(op)}
                             >
                               <FileText size={13} />
+                            </Button>
+                            <Button
+                              size="xs"
+                              variant="orange"
+                              title="Enviar estado de cuenta"
+                              onClick={() => handleSendStatement(op)}
+                              disabled={sendingStatementIds.has(op.id)}
+                              loading={sendingStatementIds.has(op.id)}
+                            >
+                              <Send size={13} />
                             </Button>
                             {activeTab === 'activas' ? (
                               <Button

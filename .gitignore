@@ -9,6 +9,7 @@ build/
 
 # Environment variables (NEVER commit)
 .env
+.env.test
 .env.local
 .env.production
 
@@ -37,6 +38,7 @@ docker-compose.override.yml
 
 # Reports (generated at runtime)
 backend/data/reports/
+backend/tmp/
 
 # Test artifacts
 test-screenshots/

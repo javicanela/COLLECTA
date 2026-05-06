@@ -242,9 +242,14 @@ describe('POST /api/whatsapp/send-media', () => {
 describe('POST /api/webhooks/evolution', () => {
   it('records incoming messages as WhatsAppMessage and LogEntry', async () => {
     const client = createClient({ telefono: '6647654321' });
+    const webhookSecret = process.env.EVOLUTION_WEBHOOK_SECRET;
 
-    const res = await buildApp()
-      .post('/api/webhooks/evolution')
+    const request = buildApp().post('/api/webhooks/evolution');
+    if (webhookSecret) {
+      request.set('X-Webhook-Secret', webhookSecret);
+    }
+
+    const res = await request
       .send({
         event: 'messages.upsert',
         data: {

@@ -16,6 +16,7 @@ n8n/workflows/
 ## Variables necesarias en n8n
 
 - `COLLECTA_API_URL`
+- `BACKEND_PUBLIC_URL` o `PUBLIC_API_BASE_URL`
 - `API_KEY`
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
@@ -24,9 +25,20 @@ n8n/workflows/
 - `EVOLUTION_API_KEY`
 - `EVOLUTION_WEBHOOK_SECRET`
 - `GEMINI_API_KEY` o provider equivalente si se habilita deteccion cloud
+- `EMAIL_PROVIDER`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `EMAIL_FROM`
+- `RESEND_API_KEY`
 
 Las llaves cloud son opcionales. La arquitectura de Smart Import y deteccion debe
 ser provider-agnostic.
+
+`BACKEND_PUBLIC_URL` o `PUBLIC_API_BASE_URL` debe apuntar al backend desde la red
+donde Evolution API descarga archivos. Si Evolution no corre en el mismo host que
+el backend, `http://localhost:3001` no servira para adjuntos PDF.
 
 ## Autenticacion backend
 
@@ -143,6 +155,20 @@ curl "$COLLECTA_API_URL/api/cobranza/cliente/XAXX010101000/pdf" \
   -H "Authorization: Bearer $API_KEY" \
   --output estado_cuenta_test.pdf
 ```
+
+Enviar estado de cuenta por flujo integrado PDF + WhatsApp media + email
+configurable + fallback manual:
+
+```bash
+curl -X POST "$COLLECTA_API_URL/api/cobranza/cliente/XAXX010101000/send-statement" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"channelPreference":"AUTO"}'
+```
+
+La URL temporal en la respuesta usa token aleatorio largo y TTL corto. No requiere
+`Authorization` para que Evolution API pueda descargar el PDF, por lo que debe
+tratarse como URL firmada efimera.
 
 Webhook Evolution:
 

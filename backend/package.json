@@ -8,9 +8,13 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "db:push": "prisma db push",
+    "db:test:push": "node --env-file-if-exists=.env.test ./node_modules/prisma/build/index.js db push --skip-generate",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
     "test": "vitest run",
+    "test:full": "node --env-file-if-exists=.env.test ./node_modules/vitest/vitest.mjs run --config vitest.config.ts",
+    "test:smoke": "node --env-file-if-exists=.env.test ./node_modules/vitest/vitest.mjs run --config vitest.config.ts src/__tests__/phase8.smoke.test.ts",
+    "test:integration": "node --env-file-if-exists=.env.test ./node_modules/vitest/vitest.mjs run --config vitest.config.ts src/__tests__",
     "test:whatsapp": "vitest run --config vitest.whatsapp.config.ts src/__tests__/whatsapp.test.ts"
   },
   "keywords": [],

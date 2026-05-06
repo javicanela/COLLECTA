@@ -7,6 +7,7 @@ export default defineConfig({
     setupFiles: ['./src/__tests__/setup.ts'],
     include: ['src/**/*.test.ts'],
     exclude: ['dist/**', 'node_modules/**'],
+    fileParallelism: false,
     testTimeout: 30000,
     hookTimeout: 30000,
     sequence: {
