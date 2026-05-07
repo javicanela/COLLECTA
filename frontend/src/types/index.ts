@@ -119,6 +119,58 @@ export interface PaymentReviewReport {
   pending: PaymentReviewItem[];
 }
 
+export type DiagnosticsCheckStatus =
+  | 'ok'
+  | 'warning'
+  | 'error'
+  | 'skipped'
+  | 'unknown'
+  | 'pass'
+  | 'passed'
+  | 'warn'
+  | 'fail'
+  | 'failed'
+  | 'ready'
+  | 'degraded'
+  | 'blocked';
+
+export interface DiagnosticsReadinessSummary {
+  total?: number;
+  ok?: number;
+  warning?: number;
+  error?: number;
+  skipped?: number;
+  passed?: number;
+  warnings?: number;
+  failed?: number;
+}
+
+export interface DiagnosticsReadinessCheck {
+  id?: string;
+  key?: string;
+  name?: string;
+  label?: string;
+  status?: DiagnosticsCheckStatus | string;
+  ok?: boolean;
+  message?: string;
+  warning?: string;
+  action?: string;
+  remediation?: string;
+  checkedAt?: string;
+}
+
+export interface DiagnosticsReadinessResponse {
+  ok?: boolean;
+  status?: DiagnosticsCheckStatus | string;
+  generatedAt?: string;
+  updatedAt?: string;
+  environment?: string;
+  summary?: DiagnosticsReadinessSummary;
+  checks?: DiagnosticsReadinessCheck[] | Record<string, DiagnosticsReadinessCheck>;
+  warnings?: string[];
+  actions?: string[];
+}
+
 // Tipos para API Responses
 export interface ApiResponse<T> {
   success: boolean;

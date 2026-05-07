@@ -1,10 +1,22 @@
 export type SmartImportCell = string | number | boolean | null;
-export type SmartImportFileType = 'csv' | 'xlsx' | 'xls' | 'unknown';
+export type SmartImportFileType =
+  | 'csv'
+  | 'xlsx'
+  | 'xls'
+  | 'pdf_text'
+  | 'pdf_ocr'
+  | 'docx'
+  | 'image_ocr'
+  | 'json'
+  | 'xml'
+  | 'unknown';
 
 export interface SmartImportSource {
   sourceId: string;
   fileName: string;
   fileType: SmartImportFileType;
+  mimeType?: string;
+  sizeBytes?: number;
 }
 
 export interface WorkbookSheetSample {
@@ -65,6 +77,13 @@ export interface ChallengeResult {
 export interface CanonicalImportRow {
   rowNumber: number;
   sourceRowIndex: number;
+  source?: {
+    fileName: string;
+    sheetName?: string;
+    pageNumber?: number;
+    regionId?: string;
+    extractor: string;
+  };
   client: Partial<{
     rfc: string;
     nombre: string;

@@ -5,6 +5,7 @@ import {
   LayoutDashboard, Users, Upload, Download,
   Settings, ScrollText, Sun, Moon, Menu, X,
   Zap, AlertCircle, Wallet, ChevronRight, Home, Bot, ReceiptText,
+  ShieldCheck,
 } from 'lucide-react';
 import { useOperationStore } from '../stores/useOperationStore';
 import { useTheme } from '../hooks/useTheme';
@@ -19,6 +20,7 @@ const menuItems = [
   { id: 'exp',    label: 'Exportar',    icon: Download,        path: '/exportar' },
   { id: 'agent',  label: 'Agente IA',   icon: Bot,             path: '/agente' },
   { id: 'payrev', label: 'Pagos',        icon: ReceiptText,     path: '/pagos/revision' },
+  { id: 'diag',   label: 'Diagnostico',  icon: ShieldCheck,     path: '/sistema/diagnostico' },
   { id: 'log',    label: 'Logs',        icon: ScrollText,      path: '/logs' },
   { id: 'conf',   label: 'Config',      icon: Settings,        path: '/config' },
 ];
@@ -30,6 +32,7 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/exportar': { title: 'Exportar', subtitle: 'Exportaciones y estadísticas' },
   '/agente': { title: 'Agente IA', subtitle: 'Cobranza autónoma con IA' },
   '/pagos/revision': { title: 'Confirmaciones de pago', subtitle: 'Revision de comprobantes ambiguos' },
+  '/sistema/diagnostico': { title: 'Diagnostico del sistema', subtitle: 'Readiness E2E de conectividad y automatizacion' },
   '/logs': { title: 'Logs', subtitle: 'Historial de envíos de cobranza' },
   '/config': { title: 'Configuración', subtitle: 'Configuración del sistema' },
 };

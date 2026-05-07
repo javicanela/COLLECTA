@@ -25,6 +25,9 @@ import importRoutes from '../routes/import';
 import n8nRoutes from '../routes/n8n';
 import whatsappRoutes from '../routes/whatsapp';
 import webhookRoutes from '../routes/webhooks';
+import cobranzaRoutes, { cobranzaPublicRouter } from '../routes/cobranza';
+import agentRoutes from '../routes/agent';
+import diagnosticsRoutes from '../routes/diagnostics';
 import { requireAuth } from '../middleware/auth';
 
 const app = express();
@@ -37,8 +40,12 @@ app.use('/api/operations', requireAuth, operationRoutes);
 app.use('/api/config', requireAuth, configRoutes);
 app.use('/api/logs', requireAuth, logsRoutes);
 app.use('/api/import', requireAuth, importRoutes);
+app.use('/api/cobranza', cobranzaPublicRouter);
+app.use('/api/cobranza', requireAuth, cobranzaRoutes);
 app.use('/api/n8n', requireAuth, n8nRoutes);
 app.use('/api/whatsapp', requireAuth, whatsappRoutes);
+app.use('/api/agent', requireAuth, agentRoutes);
+app.use('/api/diagnostics', requireAuth, diagnosticsRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
 export const req = request(app);

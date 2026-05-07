@@ -2,22 +2,29 @@ import { useCallback, useMemo, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { AlertCircle, FileSpreadsheet, RefreshCcw, UploadCloud } from 'lucide-react';
 import { Card } from '../../../components/ui/Card';
+import { parsedDocumentToWorkbookSheets } from '../domain/parsed-document-to-workbook';
 import { runSmartImportEscalation } from '../domain/provider-registry';
 import { buildCanonicalRows } from '../domain/super-identifier';
-import type { CanonicalField, MappingCandidate, SmartImportAnalysis, SmartImportFileType, SmartImportSource, WorkbookSheetSummary } from '../domain/types';
-import { parseSmartImportFile } from '../utils/parse-workbook';
+import type { SourceFileKind } from '../domain/parsed-document';
+import type { CanonicalField, MappingCandidate, SmartImportAnalysis, SmartImportSource, WorkbookSheetSummary } from '../domain/types';
+import { extractDocument } from '../extractors/extract-document';
 import { ImportSummary } from './ImportSummary';
 import { MappingReviewTable } from './MappingReviewTable';
 import { PreviewGrid } from './PreviewGrid';
 import { SheetSelector } from './SheetSelector';
 
-function getFileType(file: File): SmartImportFileType {
-  const lowerName = file.name.toLowerCase();
-  if (lowerName.endsWith('.csv')) return 'csv';
-  if (lowerName.endsWith('.xlsx')) return 'xlsx';
-  if (lowerName.endsWith('.xls')) return 'xls';
-  return 'unknown';
-}
+type ImportStatus = 'idle' | 'reading' | 'extracting_text' | 'ocr_running' | 'analyzing' | 'ready_for_review' | 'error' | 'cancelled';
+
+const STATUS_LABELS: Record<ImportStatus, string> = {
+  idle: 'Arrastra CSV, Excel, PDF, DOCX, JSON, XML o imagen',
+  reading: 'Leyendo archivo...',
+  extracting_text: 'Extrayendo contenido...',
+  ocr_running: 'Ejecutando OCR local...',
+  analyzing: 'Analizando datos...',
+  ready_for_review: 'Listo para revisar',
+  error: 'No se pudo analizar',
+  cancelled: 'Analisis cancelado',
+};
 
 function correctionsFromMappings(mappings: MappingCandidate[]): Record<number, CanonicalField | ''> {
   return Object.fromEntries(mappings.map((mapping) => [mapping.columnIndex, mapping.field])) as Record<number, CanonicalField | ''>;
@@ -30,8 +37,10 @@ export function ImportWizard() {
   const [selectedSheetId, setSelectedSheetId] = useState('');
   const [selectedRegionId, setSelectedRegionId] = useState('');
   const [corrections, setCorrections] = useState<Record<number, CanonicalField | ''>>({});
-  const [status, setStatus] = useState<'idle' | 'parsing' | 'ready' | 'error'>('idle');
+  const [status, setStatus] = useState<ImportStatus>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [documentWarnings, setDocumentWarnings] = useState<string[]>([]);
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
 
   const runAnalysis = useCallback(async (
     nextSource: SmartImportSource,
@@ -49,29 +58,49 @@ export function ImportWizard() {
     setSelectedSheetId(nextAnalysis.selectedSheet.sheetId);
     setSelectedRegionId(nextAnalysis.selectedRegion.regionId);
     setCorrections(correctionsFromMappings(nextAnalysis.mappings));
-    setStatus('ready');
+    setStatus('ready_for_review');
   }, []);
 
   const processFile = useCallback(async (file: File) => {
-    setStatus('parsing');
+    const controller = new AbortController();
+    setAbortController(controller);
+    setStatus(file.type.startsWith('image/') ? 'ocr_running' : 'reading');
     setError(null);
+    setDocumentWarnings([]);
 
     try {
-      const sourceId = crypto.randomUUID();
+      setStatus(file.type.startsWith('image/') ? 'ocr_running' : 'extracting_text');
+      const parsedDocument = await extractDocument(file, {
+        enableOcr: true,
+        signal: controller.signal,
+      });
+      const nextSheets = parsedDocumentToWorkbookSheets(parsedDocument);
+
+      if (nextSheets.length === 0) {
+        throw new Error('No se detectaron tablas o texto contable suficiente para previsualizar.');
+      }
+
       const nextSource: SmartImportSource = {
-        sourceId,
-        fileName: file.name,
-        fileType: getFileType(file),
-        mimeType: file.type,
-        sizeBytes: file.size,
+        sourceId: parsedDocument.id,
+        fileName: parsedDocument.fileName,
+        fileType: parsedDocument.kind as SourceFileKind,
+        mimeType: parsedDocument.mimeType,
+        sizeBytes: parsedDocument.sizeBytes,
       };
-      const nextSheets = await parseSmartImportFile(file, sourceId);
+      setStatus('analyzing');
       setSource(nextSource);
       setSheets(nextSheets);
+      setDocumentWarnings(parsedDocument.warnings);
       await runAnalysis(nextSource, nextSheets);
     } catch (err) {
+      if (controller.signal.aborted) {
+        setStatus('cancelled');
+        return;
+      }
       setError(err instanceof Error ? err.message : 'No se pudo analizar el archivo.');
       setStatus('error');
+    } finally {
+      setAbortController(null);
     }
   }, [runAnalysis]);
 
@@ -86,6 +115,14 @@ export function ImportWizard() {
       'text/csv': ['.csv'],
       'application/vnd.ms-excel': ['.csv', '.xls'],
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+      'application/pdf': ['.pdf'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/json': ['.json'],
+      'application/xml': ['.xml'],
+      'text/xml': ['.xml'],
+      'image/png': ['.png'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/webp': ['.webp'],
     },
     multiple: false,
   });
@@ -109,11 +146,13 @@ export function ImportWizard() {
 
   const handleSelectSheet = useCallback((sheetId: string) => {
     if (!source) return;
+    setStatus('analyzing');
     void runAnalysis(source, sheets, sheetId);
   }, [runAnalysis, sheets, source]);
 
   const handleSelectRegion = useCallback((regionId: string) => {
     if (!source) return;
+    setStatus('analyzing');
     void runAnalysis(source, sheets, selectedSheetId, regionId);
   }, [runAnalysis, selectedSheetId, sheets, source]);
 
@@ -130,7 +169,16 @@ export function ImportWizard() {
     setCorrections({});
     setStatus('idle');
     setError(null);
-  }, []);
+    setDocumentWarnings([]);
+    abortController?.abort();
+    setAbortController(null);
+  }, [abortController]);
+
+  const cancelExtraction = useCallback(() => {
+    abortController?.abort();
+    setStatus('cancelled');
+    setAbortController(null);
+  }, [abortController]);
 
   return (
     <Card variant="solid" padding="normal" className="overflow-hidden">
@@ -139,6 +187,11 @@ export function ImportWizard() {
           <h2 className="text-sm font-bold" style={{ color: 'var(--c-text)' }}>Smart Import</h2>
           <p className="text-xs mt-1" style={{ color: 'var(--c-text-muted)' }}>Preview local editable. Sin commit automatico.</p>
         </div>
+        {abortController && (
+          <button type="button" onClick={cancelExtraction} className="btn btn-ghost btn-sm self-start md:self-auto">
+            Cancelar
+          </button>
+        )}
         {analysis && (
           <button type="button" onClick={reset} className="btn btn-ghost btn-sm self-start md:self-auto">
             <RefreshCcw size={14} />
@@ -159,15 +212,15 @@ export function ImportWizard() {
           <input {...getInputProps()} />
           <div className="flex flex-col items-center gap-3">
             <div className="w-14 h-14 rounded-xl flex items-center justify-center" style={{ background: 'var(--brand-primary-dim)' }}>
-              {status === 'parsing'
+              {status === 'reading' || status === 'extracting_text' || status === 'ocr_running' || status === 'analyzing'
                 ? <FileSpreadsheet className="animate-pulse" size={24} style={{ color: 'var(--brand-primary)' }} />
                 : <UploadCloud size={24} style={{ color: 'var(--brand-primary)' }} />}
             </div>
             <div>
               <p className="font-semibold" style={{ color: 'var(--c-text)' }}>
-                {status === 'parsing' ? 'Analizando archivo...' : 'Arrastra CSV/XLSX aqui'}
+                {STATUS_LABELS[status]}
               </p>
-              <p className="text-xs mt-1" style={{ color: 'var(--c-text-muted)' }}>El analisis ocurre en el navegador.</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--c-text-muted)' }}>El analisis ocurre en el navegador. OCR no envia datos a cloud.</p>
             </div>
           </div>
         </div>
@@ -192,6 +245,13 @@ export function ImportWizard() {
           />
 
           <ImportSummary analysis={{ ...analysis, canonicalRows: previewRows }} lowConfidenceCount={lowConfidenceCount} />
+
+          {documentWarnings.length > 0 && (
+            <div className="rounded-lg border px-4 py-3 flex items-center gap-2 text-sm" style={{ borderColor: 'rgba(245,158,11,0.28)', color: 'var(--brand-warn)', background: 'rgba(245,158,11,0.08)' }}>
+              <AlertCircle size={16} />
+              {documentWarnings.join(', ')}
+            </div>
+          )}
 
           {analysis.challengeResult.warnings.length > 0 && (
             <div className="rounded-lg border px-4 py-3 flex items-center gap-2 text-sm" style={{ borderColor: 'rgba(245,158,11,0.28)', color: 'var(--brand-warn)', background: 'rgba(245,158,11,0.08)' }}>

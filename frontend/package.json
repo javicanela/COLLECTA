@@ -12,14 +12,18 @@
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.3.2",
+    "fast-xml-parser": "^5.7.3",
     "framer-motion": "^12.38.0",
     "lucide-react": "^0.577.0",
+    "mammoth": "^1.12.0",
     "papaparse": "^5.5.3",
+    "pdfjs-dist": "^5.7.284",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-dropzone": "^15.0.0",
     "react-router-dom": "^7.13.1",
-    "xlsx": "^0.18.5",
+    "tesseract.js": "^7.0.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zustand": "^5.0.12"
   },
   "devDependencies": {

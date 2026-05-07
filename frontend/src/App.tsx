@@ -13,6 +13,7 @@ import UIPreview from './views/UIPreview';
 import LogView from './views/LogView';
 import AgentView from './views/AgentView';
 import PaymentReviewView from './views/PaymentReviewView';
+import SystemReadinessView from './views/SystemReadinessView';
 import { useAuthStore } from './stores/useAuthStore';
 import './App.css';
 
@@ -63,6 +64,7 @@ function AppRoutes() {
           <Route path="exportar" element={<AnimatedRoute><ExportView /></AnimatedRoute>} />
           <Route path="agente" element={<AnimatedRoute><AgentView /></AnimatedRoute>} />
           <Route path="pagos/revision" element={<AnimatedRoute><PaymentReviewView /></AnimatedRoute>} />
+          <Route path="sistema/diagnostico" element={<AnimatedRoute><SystemReadinessView /></AnimatedRoute>} />
           <Route path="config" element={<AnimatedRoute><ConfigView /></AnimatedRoute>} />
           {import.meta.env.DEV && <Route path="ui-preview" element={<AnimatedRoute><UIPreview /></AnimatedRoute>} />}
           <Route path="logs" element={<AnimatedRoute><LogView /></AnimatedRoute>} />

@@ -1,6 +1,16 @@
 export type SmartImportCell = string | number | boolean | Date | null | undefined;
 
-export type SmartImportFileType = 'csv' | 'xlsx' | 'xls' | 'unknown';
+export type SmartImportFileType =
+  | 'csv'
+  | 'xlsx'
+  | 'xls'
+  | 'pdf_text'
+  | 'pdf_ocr'
+  | 'docx'
+  | 'image_ocr'
+  | 'json'
+  | 'xml'
+  | 'unknown';
 
 export interface SmartImportSource {
   sourceId: string;

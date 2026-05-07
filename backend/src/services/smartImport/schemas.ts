@@ -1,12 +1,33 @@
 import { z } from 'zod';
 
 const cellSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+const fileTypeSchema = z.enum([
+  'csv',
+  'xlsx',
+  'xls',
+  'pdf_text',
+  'pdf_ocr',
+  'docx',
+  'image_ocr',
+  'json',
+  'xml',
+  'unknown',
+]);
+const sourceTraceSchema = z.object({
+  fileName: z.string().min(1),
+  sheetName: z.string().optional(),
+  pageNumber: z.number().int().positive().optional(),
+  regionId: z.string().optional(),
+  extractor: z.string().min(1),
+});
 
 export const smartImportAnalyzeSchema = z.object({
   source: z.object({
     sourceId: z.string().min(1),
     fileName: z.string().min(1),
-    fileType: z.enum(['csv', 'xlsx', 'xls', 'unknown']),
+    fileType: fileTypeSchema,
+    mimeType: z.string().optional(),
+    sizeBytes: z.number().int().nonnegative().optional(),
   }),
   sheets: z.array(z.object({
     sheetId: z.string().min(1),
@@ -18,6 +39,7 @@ export const smartImportAnalyzeSchema = z.object({
 const canonicalRowSchema = z.object({
   rowNumber: z.number().int().positive(),
   sourceRowIndex: z.number().int().min(0),
+  source: sourceTraceSchema.optional(),
   client: z.object({
     rfc: z.string().optional(),
     nombre: z.string().optional(),
