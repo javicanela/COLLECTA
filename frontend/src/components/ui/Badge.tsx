@@ -33,24 +33,24 @@ interface BadgeProps {
 
 const statusConfig: Record<string, { 
   cssClass: string; 
-  icon: string;
   label?: string;
 }> = {
-  'PAGADO':       { cssClass: 'badge-pagado',      icon: '✓', label: 'Pagado' },
-  'VENCIDO':      { cssClass: 'badge-vencido',     icon: '⚠', label: 'Vencido' },
-  'HOY VENCE':    { cssClass: 'badge-hoy',         icon: '!', label: 'Hoy vence' },
-  'POR VENCER':   { cssClass: 'badge-porvencer',   icon: '⏳', label: 'Por vencer' },
-  'AL CORRIENTE': { cssClass: 'badge-alcorriente', icon: '✓', label: 'Al corriente' },
-  'PENDIENTE':    { cssClass: 'badge-pendiente',   icon: '○', label: 'Pendiente' },
-  'EXCLUIDO':     { cssClass: 'badge-excluido',    icon: '⊘', label: 'Excluido' },
-  'ACTIVO':       { cssClass: 'badge-activo',      icon: '●', label: 'Activo' },
-  'SUSPENDIDO':   { cssClass: 'badge-suspendido',  icon: '⊘', label: 'Suspendido' },
-  'ARCHIVADO':    { cssClass: 'badge-archivado',   icon: '📦', label: 'Archivado' },
-  'ENVIADO':      { cssClass: 'badge-pagado',      icon: '✓', label: 'Enviado' },
-  'BLOQUEADO':    { cssClass: 'badge-suspendido',  icon: '🚫', label: 'Bloqueado' },
-  'ERROR':        { cssClass: 'badge-vencido',     icon: '✕', label: 'Error' },
-  'PRUEBA':       { cssClass: 'badge-porvencer',   icon: '🧪', label: 'Prueba' },
-  'PRODUCCIÓN':   { cssClass: 'badge-activo',      icon: '🚀', label: 'Producción' },
+  'PAGADO':       { cssClass: 'badge-pagado',      label: 'Pagado' },
+  'VENCIDO':      { cssClass: 'badge-vencido',     label: 'Vencido' },
+  'HOY VENCE':    { cssClass: 'badge-hoy',         label: 'Hoy vence' },
+  'POR VENCER':   { cssClass: 'badge-porvencer',   label: 'Por vencer' },
+  'AL CORRIENTE': { cssClass: 'badge-alcorriente', label: 'Al corriente' },
+  'PENDIENTE':    { cssClass: 'badge-pendiente',   label: 'Pendiente' },
+  'EXCLUIDO':     { cssClass: 'badge-excluido',    label: 'Excluido' },
+  'ACTIVO':       { cssClass: 'badge-activo',      label: 'Activo' },
+  'SUSPENDIDO':   { cssClass: 'badge-suspendido',  label: 'Suspendido' },
+  'ARCHIVADO':    { cssClass: 'badge-archivado',   label: 'Archivado' },
+  'ENVIADO':      { cssClass: 'badge-pagado',      label: 'Enviado' },
+  'BLOQUEADO':    { cssClass: 'badge-suspendido',  label: 'Bloqueado' },
+  'ERROR':        { cssClass: 'badge-vencido',     label: 'Error' },
+  'PRUEBA':       { cssClass: 'badge-porvencer',   label: 'Prueba' },
+  'PRODUCCION':   { cssClass: 'badge-activo',      label: 'Produccion' },
+  'PRODUCCIÓN':   { cssClass: 'badge-activo',      label: 'Produccion' },
 };
 
 const dotStatusMap: Record<string, string> = {
@@ -76,9 +76,16 @@ export const Badge: React.FC<BadgeProps> = ({
   onClick,
   pulse = false,
 }) => {
+  const activateFromKeyboard = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (!onClick) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onClick();
+    }
+  };
+
   const config = statusConfig[status] ?? { 
     cssClass: 'badge-excluido', 
-    icon: '',
     label: status 
   };
 
@@ -103,6 +110,8 @@ export const Badge: React.FC<BadgeProps> = ({
         title={config.label || status}
         aria-label={`Estado: ${config.label || status}`}
         role={onClick ? 'button' : 'status'}
+        tabIndex={onClick ? 0 : undefined}
+        onKeyDown={activateFromKeyboard}
         whileHover={onClick ? { scale: 1.1 } : undefined}
         whileTap={onClick ? { scale: 0.95 } : undefined}
       />
@@ -127,6 +136,8 @@ export const Badge: React.FC<BadgeProps> = ({
         }}
         aria-label={`Estado: ${config.label || status}`}
         role={onClick ? 'button' : 'status'}
+        tabIndex={onClick ? 0 : undefined}
+        onKeyDown={activateFromKeyboard}
         whileHover={onClick ? { scale: 1.05 } : undefined}
         whileTap={onClick ? { scale: 0.95 } : undefined}
       >
@@ -149,10 +160,11 @@ export const Badge: React.FC<BadgeProps> = ({
       `}
       aria-label={`Estado: ${config.label || status}`}
       role={onClick ? 'button' : 'status'}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={activateFromKeyboard}
       whileHover={onClick ? { scale: 1.05 } : undefined}
       whileTap={onClick ? { scale: 0.95 } : undefined}
     >
-      {config.icon && <span aria-hidden="true">{config.icon}</span>}
       {config.label || status}
     </DefaultComponent>
   );
@@ -174,6 +186,7 @@ function getStatusColor(status: string): string {
     'BLOQUEADO': '#EF3F3F',
     'ERROR': '#EF3F3F',
     'PRUEBA': '#D97706',
+    'PRODUCCION': '#10B77D',
     'PRODUCCIÓN': '#10B77D',
   };
   return colors[status] || '#64748B';

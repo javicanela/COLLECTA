@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 
@@ -107,6 +107,7 @@ export const IconButton: React.FC<IconButtonProps> = ({
   className = '',
   disabled,
   type = 'button',
+  title,
   ...props
 }) => {
   const sizeClasses = {
@@ -117,16 +118,16 @@ export const IconButton: React.FC<IconButtonProps> = ({
   };
 
   const isDisabled = disabled;
-  const buttonId = `iconbtn-${Math.random().toString(36).substr(2, 9)}`;
+  const buttonId = useId();
+  const accessibleLabel = label || title || 'Accion';
 
   return (
     <motion.button
       id={buttonId}
       type={type}
       className={`btn ${sizeClasses[size]} ${variant === 'primary' ? 'btn-primary' : variant === 'green' ? 'btn-green' : variant === 'red' ? 'btn-red' : variant === 'blue' ? 'btn-blue' : variant === 'orange' ? 'btn-orange' : variant === 'purple' ? 'btn-purple' : variant === 'gold' ? 'btn-gold' : 'btn-ghost'} ${className}`}
-      title={label}
-      aria-label={label}
-      aria-describedby={label ? `${buttonId}-desc` : undefined}
+      title={title || label}
+      aria-label={accessibleLabel}
       disabled={isDisabled}
       whileHover={{ scale: isDisabled ? 1 : 1.08 }}
       whileTap={{ scale: isDisabled ? 1 : 0.92 }}

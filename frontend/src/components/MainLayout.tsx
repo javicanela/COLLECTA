@@ -44,7 +44,9 @@ export default function MainLayout() {
   const { toasts } = useToast();
 
   const [activeProvider, setActiveProvider] = useState<string | null>(null);
-  const [sysMode, setSysMode] = useState<string>('PRUEBA');
+  const [sysMode, setSysMode] = useState<string>(() =>
+    localStorage.getItem('sys_modo') || 'PRUEBA',
+  );
   const [waStatus, setWaStatus] = useState<'connected' | 'disconnected' | 'not_configured' | 'error'>('not_configured');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -54,9 +56,7 @@ export default function MainLayout() {
   }, [fetchOperations]);
 
   useEffect(() => {
-    // Cargar config y modo desde localStorage al iniciar
     const savedModo = localStorage.getItem('sys_modo');
-    if (savedModo) setSysMode(savedModo);
     
     api.get<Record<string, string>>('/config').then(cfg => {
       setActiveProvider(cfg['active_api_provider'] || null);
@@ -104,7 +104,7 @@ export default function MainLayout() {
       document.body.style.overflow = '';
     }
     return () => { document.body.style.overflow = ''; };
-  }, []);
+  }, [sidebarOpen]);
 
   const pageInfo = useMemo(() => {
     const exact = pageTitles[location.pathname];
@@ -119,6 +119,7 @@ export default function MainLayout() {
     path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
 
   const isDark = theme === 'dark';
+  const isProductionMode = sysMode === 'PRODUCCION' || sysMode === 'PRODUCCIÓN';
   
   const sidebarBg = isDark 
     ? 'rgba(15, 23, 42, 0.92)' 
@@ -302,20 +303,20 @@ export default function MainLayout() {
             <div
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl mb-3 text-xs"
               style={{
-                background: sysMode === 'PRODUCCIÓN' ? 'rgba(16,183,125,0.15)' : 'rgba(245,158,11,0.15)',
-                border: `1px solid ${sysMode === 'PRODUCCIÓN' ? 'rgba(16,183,125,0.25)' : 'rgba(245,158,11,0.25)'}`,
+                background: isProductionMode ? 'rgba(16,183,125,0.15)' : 'rgba(245,158,11,0.15)',
+                border: `1px solid ${isProductionMode ? 'rgba(16,183,125,0.25)' : 'rgba(245,158,11,0.25)'}`,
               }}
             >
               <span
                 className="w-2 h-2 rounded-full animate-pulse"
                 style={{
-                  background: sysMode === 'PRODUCCIÓN' ? '#10B77D' : '#F59E0B',
-                  boxShadow: `0 0 8px ${sysMode === 'PRODUCCIÓN' ? '#10B77D' : '#F59E0B'}`,
+                  background: isProductionMode ? '#10B77D' : '#F59E0B',
+                  boxShadow: `0 0 8px ${isProductionMode ? '#10B77D' : '#F59E0B'}`,
                 }}
               />
               <span
                 className="font-bold uppercase tracking-wider"
-                style={{ color: sysMode === 'PRODUCCIÓN' ? '#10B77D' : '#F59E0B' }}
+                style={{ color: isProductionMode ? '#10B77D' : '#F59E0B' }}
               >
                 {sysMode}
               </span>
