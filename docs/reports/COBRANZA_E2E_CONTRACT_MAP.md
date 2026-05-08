@@ -1,10 +1,9 @@
 # Cobranza E2E Contract Map
 
-Scope: Plan 04 Worker B documentation and n8n workflow integrity only.
+Scope: Plan 04 backend/frontend connectivity, split E2E tests, n8n workflow integrity, and manual verification map.
 
-Non-goals for this Worker B pass:
+Non-goals for this pass:
 
-- No frontend or backend app code changes.
 - No package, dependency, Prisma schema, or environment changes.
 - No Smart Import implementation or dependency work. Import routes are mapped only as existing ingestion contracts.
 - No claim that backend diagnostics can prove frontend routes render; frontend checks belong in build/manual verification.
@@ -98,7 +97,7 @@ Source files reviewed:
 | Temporary PDF media | `/api/cobranza/media/:token` | GET | Public ephemeral token | token path param | PDF file or 404/410 | Existing in code; intentionally no Bearer so external media clients can fetch short-lived files. |
 | Evolution webhook | `/api/webhooks/evolution` | POST | `X-Webhook-Secret` | Evolution event payload | Webhook result | Existing in code; not Bearer auth. |
 | Health | `/api/health` | GET | Public | none | Lightweight status/timestamp with DB ping | Existing in code; should stay lightweight. |
-| E2E readiness | `/api/diagnostics/e2e-readiness` | GET | Bearer | none | Readiness checklist | Protected diagnostic target pending parent implementation/verification. It must not claim frontend routes render. |
+| E2E readiness | `/api/diagnostics/e2e-readiness` | GET | Bearer | none | Backend/service readiness checklist | Implemented as protected diagnostics. It does not claim frontend routes render. |
 
 ## n8n Workflows
 
@@ -123,6 +122,7 @@ Frontend routes observed in `frontend/src/App.tsx`:
 | `/pagos/revision` | `PaymentReviewView` | Manual payment review. | Frontend build/manual browser check. |
 | `/config` | `ConfigView` | Templates and operating config. | Frontend build/manual browser check. |
 | `/logs` | `LogView` | Audit log review. | Frontend build/manual browser check. |
+| `/sistema/diagnostico` | `SystemReadinessView` | Backend/service readiness checklist. | Frontend build/manual browser check plus protected diagnostics API. |
 | `/ui-preview` | `UIPreview` | Dev-only UI preview. | Dev build only. |
 
 Backend diagnostics should only report backend/service readiness. They should not assert that these frontend routes rendered successfully.
@@ -143,8 +143,8 @@ Backend diagnostics should only report backend/service readiness. They should no
 
 | Gap | Impact | Current handling |
 |---|---|---|
-| Protected readiness route `/api/diagnostics/e2e-readiness` is a Plan 04 target but not verified by Worker B app-code changes. | Full readiness dashboard/report remains pending parent implementation or verification. | Documented as pending parent verification; `/api/health` remains lightweight. |
-| Worker B does not run full backend build or browser/manual route rendering. | Connectivity report remains draft for parent to complete. | Manual test script lists exact checks. |
+| Local PostgreSQL may be offline on a developer machine. | DB-backed integration tests cannot start until test DB is reachable. | `backend/scripts/ensure-test-db.js` and `npm run test:prepare` validate safe DB URLs, attempt Docker startup, and print actionable remediation. |
+| Browser/manual route rendering is not proven by backend diagnostics. | UI routes still need manual/browser verification when doing final operator signoff. | Frontend build passes; manual script lists exact checks. |
 | External services may not be configured locally. | n8n workflows can parse and pass auth integrity while external sends remain untested. | Checklist separates Collecta auth checks from Telegram/Gemini/Evolution contracts. |
 | Workflow 03 uses Gemini-specific node URL in export. | This is acceptable for a sample workflow, but Collecta should remain provider-agnostic. | Treat as optional provider path; avoid sending sensitive production data. |
 | Import routes are mapped but not expanded in this Plan 04 Worker B pass. | E2E data setup may rely on existing import behavior or direct API creation. | Avoid Smart Import/dependency work here. |

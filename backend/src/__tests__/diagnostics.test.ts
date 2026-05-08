@@ -5,6 +5,10 @@ function serialized(body: unknown) {
   return JSON.stringify(body);
 }
 
+function checksById(body: { checks: Array<{ id: string }> }) {
+  return Object.fromEntries(body.checks.map(check => [check.id, check]));
+}
+
 describe('GET /api/diagnostics/e2e-readiness', () => {
   it('requires auth', async () => {
     const res = await req.get('/api/diagnostics/e2e-readiness');
@@ -21,43 +25,44 @@ describe('GET /api/diagnostics/e2e-readiness', () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
       service: 'collecta-backend',
+      ready: expect.any(Boolean),
       status: expect.any(String),
-      checks: {
-        database: { status: 'ok' },
-        auth: { status: 'ok', configured: true },
-        routes: {
-          pendingCollections: {
-            status: 'ok',
-            method: 'GET',
-            path: '/api/n8n/pending-collections',
-          },
-          whatsapp: {
-            status: 'ok',
-            method: 'GET',
-            path: '/api/whatsapp/status',
-          },
-          sendStatement: {
-            status: 'ok',
-            method: 'POST',
-            path: '/api/cobranza/cliente/:rfc/send-statement',
-          },
-          paymentDetection: {
-            status: 'ok',
-            method: 'POST',
-            path: '/api/n8n/payment-detections',
-          },
-        },
-        n8nWorkflows: {
-          status: 'ok',
-          expected: [
-            '01_reporte_diario_cartera.json',
-            '02_cobranza_automatica_whatsapp.json',
-            '03_deteccion_pagos_gemini_vision.json',
-            '04_cobranza_email_pdf.json',
-          ],
-        },
+      summary: {
+        total: expect.any(Number),
+        ok: expect.any(Number),
+        warning: expect.any(Number),
+        error: expect.any(Number),
       },
     });
+    expect(Array.isArray(res.body.checks)).toBe(true);
+    const checks = checksById(res.body);
+    expect(checks.database).toMatchObject({
+      id: 'database',
+      label: 'Database',
+      status: expect.stringMatching(/^(ok|error)$/),
+    });
+    expect(checks.auth).toMatchObject({ status: 'ok' });
+    expect(checks.pendingCollections).toMatchObject({
+      status: 'ok',
+      method: 'GET',
+      path: '/api/n8n/pending-collections',
+    });
+    expect(checks.whatsapp).toMatchObject({
+      status: 'ok',
+      method: 'GET',
+      path: '/api/whatsapp/status',
+    });
+    expect(checks.sendStatement).toMatchObject({
+      status: 'ok',
+      method: 'POST',
+      path: '/api/cobranza/cliente/:rfc/send-statement',
+    });
+    expect(checks.paymentDetection).toMatchObject({
+      status: 'ok',
+      method: 'POST',
+      path: '/api/n8n/payment-detections',
+    });
+    expect(checks.n8nWorkflows).toMatchObject({ status: 'ok' });
     expect(serialized(res.body)).not.toContain('frontend');
   });
 
@@ -116,11 +121,15 @@ describe('GET /api/diagnostics/e2e-readiness', () => {
       expect(res.status).toBe(200);
       expect(res.body.warnings).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ code: 'whatsapp_integration_unconfigured' }),
-          expect.objectContaining({ code: 'email_integration_unconfigured' }),
-          expect.objectContaining({ code: 'payment_detection_provider_unconfigured' }),
+          expect.stringContaining('WhatsApp automation is not fully configured'),
+          expect.stringContaining('Email delivery is not fully configured'),
+          expect.stringContaining('Cloud payment detection providers are not configured'),
         ]),
       );
+      const checks = checksById(res.body);
+      expect(checks.evolution).toMatchObject({ status: 'warning' });
+      expect(checks.email).toMatchObject({ status: 'warning' });
+      expect(checks.paymentDetectionProvider).toMatchObject({ status: 'warning' });
     } finally {
       for (const [key, value] of Object.entries(original)) {
         if (value === undefined) {

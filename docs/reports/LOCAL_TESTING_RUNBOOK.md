@@ -34,6 +34,26 @@ ambas variables porque `backend/prisma/schema.prisma` define `directUrl`.
 
 ## Levantar PostgreSQL local
 
+El flujo recomendado ahora es dejar que el backend prepare la DB de prueba:
+
+```bash
+cd backend
+npm run test:prepare
+```
+
+Ese comando:
+
+- carga `backend/.env.test` si existe;
+- valida que `DATABASE_URL` apunte a una base local/test/e2e;
+- verifica si PostgreSQL escucha en el host/puerto configurado;
+- si no escucha, intenta levantar `docker-compose.test.yml`;
+- aplica el schema Prisma con `db:test:push`.
+
+Si Docker Desktop no esta abierto, el comando termina con instrucciones claras
+para abrir Docker y volver a correr `npm run test:prepare`.
+
+Tambien puedes levantar PostgreSQL manualmente desde la raiz:
+
 Desde la raiz:
 
 ```bash
@@ -75,7 +95,7 @@ node --env-file=.env.test ./node_modules/prisma/build/index.js validate
 Preparar schema en PostgreSQL:
 
 ```bash
-npm run db:test:push
+npm run test:prepare
 ```
 
 Compilar:
@@ -103,8 +123,9 @@ npm run test:full
 ```
 
 Los scripts `db:test:push`, `test:smoke`, `test:integration` y `test:full`
-cargan `backend/.env.test` si existe. En CI usan las variables definidas por el
-workflow.
+cargan `backend/.env.test` si existe. `test:smoke`, `test:integration` y
+`test:full` tambien ejecutan `test:prepare` antes de Vitest para reducir fallos
+por una DB local apagada. En CI usan las variables definidas por el workflow.
 
 ## Frontend
 
@@ -144,7 +165,7 @@ npm run db:test:push
 | Sintoma | Causa probable | Accion |
 |---|---|---|
 | `Environment variable not found: DIRECT_URL` | Falta `DIRECT_URL` en el entorno usado por Prisma. | Copiar `backend/.env.test.example` a `backend/.env.test` o exportar `DIRECT_URL`. |
-| `Can't reach database server at localhost:5432` | PostgreSQL no esta levantado o el puerto no coincide. | Ejecutar `docker compose -f docker-compose.test.yml up -d` y revisar `ps`. |
+| `Can't reach database server at localhost:5432` | PostgreSQL no esta levantado o el puerto no coincide. | Ejecutar `cd backend; npm run test:prepare`. Si Docker no esta activo, abrir Docker Desktop y repetir. |
 | Puerto `5432` ocupado | Ya hay otro PostgreSQL local. | Detenerlo o cambiar el puerto publicado y las URLs en `.env.test`. |
 | Tests de API fallan al limpiar datos | El schema no fue aplicado. | Ejecutar `npm run db:test:push`. |
 | Docker Desktop muestra `Virtualization support not detected` | La virtualizacion esta deshabilitada en BIOS/UEFI o no hay virtualizacion anidada. | Habilitar Intel VT-x/Virtualization Technology en BIOS/UEFI y reiniciar. Despues confirmar con `Get-CimInstance Win32_Processor | Select-Object VirtualizationFirmwareEnabled`. |

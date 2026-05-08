@@ -21,11 +21,17 @@ git status --short
 
 Confirm any unrelated dirty files belong to other workers and are not part of this manual test.
 
-Start test database if needed:
+Prepare the test database. This validates that `.env.test` points to a safe
+local/test/e2e database, starts the local Docker service when possible, and
+applies the Prisma schema:
 
 ```powershell
-docker compose -f docker-compose.test.yml up -d
+cd "C:\Users\LENOVO\Documents\New project\backend"
+npm run test:prepare
 ```
+
+If Docker Desktop is closed, open Docker Desktop, wait until the engine is
+running, and repeat `npm run test:prepare`.
 
 Backend environment:
 
@@ -63,7 +69,7 @@ Expected:
 - It does not include secrets.
 - It remains lightweight and does not claim full E2E readiness.
 
-Protected readiness check, when parent implementation exists:
+Protected readiness check:
 
 ```powershell
 curl.exe "http://localhost:3001/api/diagnostics/e2e-readiness" `
@@ -74,7 +80,8 @@ Expected:
 
 - Without auth: 401.
 - With auth: backend/service readiness checklist only.
-- If route is not present in this branch, record as pending parent verification.
+- Warnings for unconfigured WhatsApp/email/provider integrations are acceptable
+  in local dev when fallback paths remain available.
 
 ## 3. Start Frontend
 

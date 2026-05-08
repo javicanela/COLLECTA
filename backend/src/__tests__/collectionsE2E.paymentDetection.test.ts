@@ -19,7 +19,7 @@ describe('Collections E2E: payment detection route', () => {
       .post('/api/n8n/payment-detections')
       .set(TEST_AUTH.headers)
       .send({
-        rfc: fixture.clients.primary.rfc,
+        rfc: fixture.clients.vencido.rfc,
         monto: target.monto,
         fechaPago: '2026-05-06',
         referencia: 'E2E-PAYMENT-REFERENCE-001',

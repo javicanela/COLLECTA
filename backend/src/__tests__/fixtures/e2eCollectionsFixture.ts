@@ -4,11 +4,27 @@ export const E2E_RFC_PREFIX = 'E2E';
 
 export const e2eClients = [
   {
-    key: 'primary',
-    rfc: 'E2E010101AA1',
-    nombre: 'E2E Cliente Cobranza',
-    telefono: '+52 664 900 0001',
-    email: 'e2e.collecta@example.com',
+    key: 'vencido',
+    rfc: 'E2EA010101AA1',
+    nombre: 'Cliente E2E Vencido',
+    telefono: '6641234567',
+    email: 'vencido@example.test',
+    asesor: 'E2E QA',
+  },
+  {
+    key: 'hoy',
+    rfc: 'E2EB010101BB2',
+    nombre: 'Cliente E2E Hoy',
+    telefono: '6647654321',
+    email: 'hoy@example.test',
+    asesor: 'E2E QA',
+  },
+  {
+    key: 'sinContacto',
+    rfc: 'E2EC010101CC3',
+    nombre: 'Cliente E2E Sin Contacto',
+    telefono: null,
+    email: null,
     asesor: 'E2E QA',
   },
 ] as const;
@@ -156,28 +172,35 @@ export async function seedE2ECollectionsFixture(prisma: PrismaClient): Promise<E
   await cleanupE2EData(prisma);
 
   const today = startOfLocalDay();
-  const primary = await prisma.client.create({
-    data: {
-      rfc: e2eClients[0].rfc,
-      nombre: e2eClients[0].nombre,
-      telefono: e2eClients[0].telefono,
-      email: e2eClients[0].email,
-      asesor: e2eClients[0].asesor,
-      estado: 'ACTIVO',
-    },
-  });
+  const createdClients = await Promise.all(
+    e2eClients.map(client =>
+      prisma.client.create({
+        data: {
+          rfc: client.rfc,
+          nombre: client.nombre,
+          telefono: client.telefono,
+          email: client.email,
+          asesor: client.asesor,
+          estado: 'ACTIVO',
+        },
+      }),
+    ),
+  );
+  const clients = Object.fromEntries(
+    e2eClients.map((client, index) => [client.key, createdClients[index]]),
+  ) as Record<E2EClientKey, Client>;
 
-  const baseOperation = {
-    clientId: primary.id,
+  const baseOperation = (clientKey: E2EClientKey) => ({
+    clientId: clients[clientKey].id,
     tipo: 'FISCAL',
-    asesor: e2eClients[0].asesor,
+    asesor: clients[clientKey].asesor,
     estatus: 'PENDIENTE',
-  };
+  });
 
   const operations = {
     vencida: await prisma.operation.create({
       data: {
-        ...baseOperation,
+        ...baseOperation('vencido'),
         descripcion: 'E2E vencida',
         monto: 1100,
         fechaVence: addDays(today, -2),
@@ -185,7 +208,7 @@ export async function seedE2ECollectionsFixture(prisma: PrismaClient): Promise<E
     }),
     hoy: await prisma.operation.create({
       data: {
-        ...baseOperation,
+        ...baseOperation('hoy'),
         descripcion: 'E2E hoy',
         monto: 2200,
         fechaVence: today,
@@ -193,7 +216,7 @@ export async function seedE2ECollectionsFixture(prisma: PrismaClient): Promise<E
     }),
     porVencer: await prisma.operation.create({
       data: {
-        ...baseOperation,
+        ...baseOperation('vencido'),
         descripcion: 'E2E por vencer',
         monto: 3300,
         fechaVence: addDays(today, 3),
@@ -201,7 +224,7 @@ export async function seedE2ECollectionsFixture(prisma: PrismaClient): Promise<E
     }),
     excluida: await prisma.operation.create({
       data: {
-        ...baseOperation,
+        ...baseOperation('sinContacto'),
         descripcion: 'E2E excluida',
         monto: 4400,
         fechaVence: addDays(today, -1),
@@ -210,7 +233,7 @@ export async function seedE2ECollectionsFixture(prisma: PrismaClient): Promise<E
     }),
     pagada: await prisma.operation.create({
       data: {
-        ...baseOperation,
+        ...baseOperation('hoy'),
         descripcion: 'E2E pagada',
         monto: 5500,
         fechaVence: addDays(today, -3),
@@ -220,7 +243,7 @@ export async function seedE2ECollectionsFixture(prisma: PrismaClient): Promise<E
     }),
     archivada: await prisma.operation.create({
       data: {
-        ...baseOperation,
+        ...baseOperation('sinContacto'),
         descripcion: 'E2E archivada',
         monto: 6600,
         fechaVence: addDays(today, -4),
@@ -230,7 +253,7 @@ export async function seedE2ECollectionsFixture(prisma: PrismaClient): Promise<E
   };
 
   return {
-    clients: { primary },
+    clients,
     operations,
   };
 }

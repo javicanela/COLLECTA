@@ -18,20 +18,20 @@ describe('Collections E2E: logs route', () => {
       .post('/api/logs')
       .set(TEST_AUTH.headers)
       .send({
-        clientId: fixture.clients.primary.id,
+        clientId: fixture.clients.vencido.id,
         tipo: 'E2E_COLLECTION_LOG',
         resultado: 'ENVIADO',
-        mensaje: `E2E log for ${fixture.clients.primary.rfc}`,
-        telefono: fixture.clients.primary.telefono,
+        mensaje: `E2E log for ${fixture.clients.vencido.rfc}`,
+        telefono: fixture.clients.vencido.telefono,
         modo: 'PRUEBA',
       });
 
     expect(created.status).toBe(201);
     expect(created.body).toMatchObject({
-      clientId: fixture.clients.primary.id,
+      clientId: fixture.clients.vencido.id,
       tipo: 'E2E_COLLECTION_LOG',
       resultado: 'ENVIADO',
-      telefono: fixture.clients.primary.telefono,
+      telefono: fixture.clients.vencido.telefono,
     });
 
     const listed = await req

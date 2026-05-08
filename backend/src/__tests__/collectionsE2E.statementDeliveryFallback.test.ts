@@ -42,7 +42,7 @@ describe('Collections E2E: statement delivery fallback', () => {
       const fixture = await seedE2ECollectionsFixture(prisma);
 
       const res = await req
-        .post(`/api/cobranza/cliente/${fixture.clients.primary.rfc}/send-statement`)
+        .post(`/api/cobranza/cliente/${fixture.clients.vencido.rfc}/send-statement`)
         .set(TEST_AUTH.headers)
         .send({ channelPreference: 'AUTO' });
 
@@ -50,7 +50,7 @@ describe('Collections E2E: statement delivery fallback', () => {
       expect(res.body).toMatchObject({
         success: false,
         channel: 'MANUAL_FALLBACK',
-        clientId: fixture.clients.primary.id,
+        clientId: fixture.clients.vencido.id,
         error: 'automatic_channels_unavailable',
       });
       expect(res.body.mediaUrl).toContain('/api/cobranza/media/');
@@ -58,7 +58,7 @@ describe('Collections E2E: statement delivery fallback', () => {
 
       const fallbackLog = await prisma.logEntry.findFirst({
         where: {
-          clientId: fixture.clients.primary.id,
+          clientId: fixture.clients.vencido.id,
           tipo: 'STATEMENT_DELIVERY',
           variante: 'MANUAL_FALLBACK',
         },

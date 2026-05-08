@@ -11,7 +11,7 @@ describe('Collections E2E: agent execution and approval', () => {
     await cleanupE2EData(prisma);
   });
 
-  it('plans one pending handoff action and approves it through the real routes', async () => {
+  it('plans pending handoff actions and approves one through the real routes', async () => {
     const fixture = await seedE2ECollectionsFixture(prisma);
 
     const started = await req
@@ -21,10 +21,10 @@ describe('Collections E2E: agent execution and approval', () => {
 
     expect(started.status).toBe(201);
     expect(started.body.summary).toMatchObject({
-      planned: 1,
-      approvalRequired: 1,
       automatic: 0,
     });
+    expect(started.body.summary.planned).toBeGreaterThanOrEqual(1);
+    expect(started.body.summary.approvalRequired).toBe(started.body.summary.planned);
 
     const pending = await req
       .get('/api/agent/actions/pending')
@@ -32,12 +32,12 @@ describe('Collections E2E: agent execution and approval', () => {
 
     expect(pending.status).toBe(200);
     const [action] = pending.body.actions.filter((item: { phone: string }) =>
-      item.phone === fixture.clients.primary.telefono,
+      item.phone === fixture.clients.vencido.telefono,
     );
     expect(action).toMatchObject({
       type: 'WHATSAPP_MESSAGE',
       status: 'PENDING',
-      phone: fixture.clients.primary.telefono,
+      phone: fixture.clients.vencido.telefono,
     });
 
     const approved = await req
@@ -57,7 +57,7 @@ describe('Collections E2E: agent execution and approval', () => {
     const approvalLog = await prisma.logEntry.findFirst({
       where: {
         tipo: 'AGENT_ACTION_APPROVED',
-        telefono: fixture.clients.primary.telefono,
+        telefono: fixture.clients.vencido.telefono,
       },
     });
     expect(approvalLog).toMatchObject({
