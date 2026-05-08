@@ -1,10 +1,26 @@
 export { Button, IconButton } from './Button';
+export { ActionButton } from './ActionButton';
+export type { ActionButtonProps } from './ActionButton';
 export { Input, Textarea } from './Input';
 export { Select } from './Select';
 export type { SelectOption } from './Select';
 export { Card, CardHeader, CardBody, CardFooter } from './Card';
 export { Badge, BadgeGroup } from './Badge';
 export type { BadgeStatus, BadgeVariant, BadgeSize } from './Badge';
+export { StatusBadge } from './StatusBadge';
+export type { StatusBadgeProps, StatusBadgeVariant } from './StatusBadge';
+export { InlineAlert } from './InlineAlert';
+export type { InlineAlertProps } from './InlineAlert';
+export { Metric } from './Metric';
+export type { MetricProps } from './Metric';
+export { SegmentedControl } from './SegmentedControl';
+export type { SegmentedControlOption, SegmentedControlProps } from './SegmentedControl';
+export { StateBlock } from './StateBlock';
+export type { StateBlockProps } from './StateBlock';
+export { Toolbar } from './Toolbar';
+export type { ToolbarProps } from './Toolbar';
+export { getOperationStatusTone, getToneClasses, normalizeStatusKey } from './statusTone';
+export type { StatusTone, StatusToneVariant } from './statusTone';
 export { 
   TextField, 
   PasswordField, 
