@@ -1,154 +1,87 @@
-import { useEffect, useState, useMemo } from 'react';
-import { Search, Filter, RefreshCw, History } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, Clock3, RefreshCw, ShieldCheck } from 'lucide-react';
 import Topbar from '../components/Topbar';
 import { LogService } from '../services/logService';
 import type { LogEntry } from '../types';
-import { Table } from '../components/ui/Table';
-import type { Column } from '../components/ui/Table';
-import { Badge } from '../components/ui/Badge';
-import { Card } from '../components/ui/Card';
+import { AuditEventDrawer } from '../components/audit/AuditEventDrawer';
+import { AuditFilters, type AuditFiltersState } from '../components/audit/AuditFilters';
+import {
+  AuditTimeline,
+  auditOutcomeMeta,
+  auditTypeMeta,
+  filterAuditEvents,
+  normalizeAuditEvents,
+} from '../components/audit/AuditTimeline';
+import type { AuditEvent, AuditEventType, AuditOutcome } from '../components/audit/AuditTimeline';
 
-const ffd = (iso: string | undefined) => {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? iso : d.toLocaleString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const defaultFilters: AuditFiltersState = {
+  type: 'all',
+  outcome: 'all',
+  query: '',
+  from: '',
+  to: '',
 };
+
+const typeOrder: AuditEventType[] = ['WHATSAPP', 'EMAIL', 'PAYMENT_DETECTION', 'AGENT', 'IMPORT', 'ERROR'];
 
 export default function LogView() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterResultado, setFilterResultado] = useState<string>('all');
-  const [filterModo, setFilterModo] = useState<string>('all');
+  const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<AuditFiltersState>(defaultFilters);
+  const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null);
 
-  const fetchLogs = () => {
+  const fetchLogs = useCallback(async () => {
     setIsLoading(true);
-    LogService.getAll()
-      .then(setLogs)
-      .catch(() => {})
-      .finally(() => setIsLoading(false));
-  };
+    setError(null);
 
-  useEffect(() => {
-    fetchLogs();
+    try {
+      const nextLogs = await LogService.getAll();
+      setLogs(Array.isArray(nextLogs) ? nextLogs : []);
+    } catch {
+      setError('No se pudo cargar la auditoria');
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  const filteredLogs = useMemo(() => {
-    return logs.filter(log => {
-      const matchesSearch = !searchQuery || 
-        log.client?.nombre?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        log.client?.rfc?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        log.mensaje?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        log.telefono?.includes(searchQuery);
-      
-      const matchesResultado = filterResultado === 'all' || log.resultado === filterResultado;
-      const matchesModo = filterModo === 'all' || log.modo === filterModo;
-      
-      return matchesSearch && matchesResultado && matchesModo;
-    });
-  }, [logs, searchQuery, filterResultado, filterModo]);
+  useEffect(() => {
+    let active = true;
 
-  const columns: Column<LogEntry>[] = useMemo(() => [
-    {
-      key: 'createdAt',
-      header: 'Fecha/Hora',
-      width: '160px',
-      render: (row) => (
-        <span className="font-mono text-xs" style={{ color: 'var(--c-text-muted)' }}>
-          {ffd(row.createdAt)}
-        </span>
-      )
-    },
-    {
-      key: 'client',
-      header: 'Cliente',
-      width: '180px',
-      render: (row) => (
-        <span className="font-semibold text-sm" style={{ color: 'var(--c-text)' }}>
-          {row.client?.nombre || '—'}
-        </span>
-      )
-    },
-    {
-      key: 'rfc',
-      header: 'RFC',
-      width: '120px',
-      render: (row) => (
-        <span className="font-mono text-xs" style={{ color: 'var(--c-text-2)' }}>
-          {row.client?.rfc || '—'}
-        </span>
-      )
-    },
-    {
-      key: 'telefono',
-      header: 'Teléfono',
-      width: '130px',
-      render: (row) => (
-        <span className="font-mono text-xs" style={{ color: 'var(--c-text-2)' }}>
-          {row.telefono || '—'}
-        </span>
-      )
-    },
-    {
-      key: 'tipo',
-      header: 'Tipo',
-      width: '100px',
-      render: (row) => (
-        <span className="text-xs font-semibold uppercase" style={{ color: 'var(--c-text-2)' }}>
-          {row.tipo}
-        </span>
-      )
-    },
-    {
-      key: 'variante',
-      header: 'Variante',
-      width: '120px',
-      render: (row) => (
-        <span className="text-xs font-semibold uppercase" style={{ color: 'var(--c-text-2)' }}>
-          {row.variante || '—'}
-        </span>
-      )
-    },
-    {
-      key: 'modo',
-      header: 'Modo',
-      width: '110px',
-      render: (row) => (
-        <Badge 
-          status={row.modo === 'PRODUCCIÓN' ? 'PRODUCCIÓN' : 'PRUEBA'} 
-          size="sm" 
-        />
-      )
-    },
-    {
-      key: 'resultado',
-      header: 'Resultado',
-      width: '110px',
-      render: (row) => (
-        <Badge 
-          status={row.resultado as any} 
-          size="sm" 
-        />
-      )
-    },
-    {
-      key: 'mensaje',
-      header: 'Mensaje',
-      render: (row) => (
-        <span className="text-xs max-w-[280px] truncate block" style={{ color: 'var(--c-text-muted)' }}>
-          {row.mensaje || '—'}
-        </span>
-      )
-    }
-  ], []);
+    const load = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const nextLogs = await LogService.getAll();
+        if (active) setLogs(Array.isArray(nextLogs) ? nextLogs : []);
+      } catch {
+        if (active) setError('No se pudo cargar la auditoria');
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    };
+
+    void load();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const events = useMemo(() => normalizeAuditEvents(logs), [logs]);
+  const filteredEvents = useMemo(() => filterAuditEvents(events, filters), [events, filters]);
+  const metrics = useMemo(() => buildAuditMetrics(events), [events]);
+  const timelineError = error && events.length === 0 ? error : null;
 
   return (
     <>
-      <Topbar 
-        title="Log de Envíos WA" 
-        subtitle="Bitácora de mensajes enviados"
-        actions={
-          <button 
+      <Topbar
+        title="Auditoria operativa"
+        subtitle="Linea de tiempo de comunicaciones, pagos, agente e importaciones"
+        actions={(
+          <button
+            type="button"
             onClick={fetchLogs}
             disabled={isLoading}
             className="btn btn-ghost btn-sm gap-2"
@@ -156,95 +89,155 @@ export default function LogView() {
             <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
             Actualizar
           </button>
-        }
+        )}
       />
 
-      <div className="p-5 max-w-7xl mx-auto w-full flex flex-col gap-4">
-        {/* Filters */}
-        <Card variant="glass" padding="normal">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-              <Search size={16} className="text-[var(--c-text-muted)]" />
-              <input
-                type="text"
-                placeholder="Buscar por cliente, RFC, teléfono o mensaje..."
-                className="flex-1 bg-transparent outline-none text-sm"
-                style={{ color: 'var(--c-text)' }}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-5 p-5">
+        <section className="grid gap-3 lg:grid-cols-[1.25fr_0.75fr]">
+          <div className="rounded-md border border-[var(--c-border-subtle)] bg-[var(--c-surface)] p-5 shadow-[var(--c-shadow-sm)]">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase text-[var(--c-text-muted)]">Eventos auditados</p>
+                <div className="mt-2 flex items-end gap-3">
+                  <span className="font-mono text-3xl font-semibold leading-none text-[var(--c-text)]">{events.length}</span>
+                  <span className="pb-1 text-sm text-[var(--c-text-2)]">
+                    {filteredEvents.length === events.length ? 'visibles' : `${filteredEvents.length} filtrados`}
+                  </span>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <MetricPill
+                  label={auditOutcomeMeta.SUCCESS.label}
+                  value={metrics.outcomes.SUCCESS}
+                  toneClass={auditOutcomeMeta.SUCCESS.toneClass}
+                />
+                <MetricPill
+                  label={auditOutcomeMeta.WARNING.label}
+                  value={metrics.outcomes.WARNING}
+                  toneClass={auditOutcomeMeta.WARNING.toneClass}
+                />
+                <MetricPill
+                  label={auditOutcomeMeta.ERROR.label}
+                  value={metrics.outcomes.ERROR}
+                  toneClass={auditOutcomeMeta.ERROR.toneClass}
+                />
+              </div>
             </div>
-            <div className="h-6 w-px" style={{ background: 'var(--c-border)' }} />
-            <div className="flex items-center gap-2">
-              <Filter size={14} style={{ color: 'var(--c-text-muted)' }} />
-              <select
-                value={filterResultado}
-                onChange={(e) => setFilterResultado(e.target.value)}
-                className="input-base text-sm py-1.5 px-3 rounded-lg"
-                style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)' }}
-              >
-                <option value="all">Todos los resultados</option>
-                <option value="ENVIADO">Enviado</option>
-                <option value="BLOQUEADO">Bloqueado</option>
-                <option value="ERROR">Error</option>
-              </select>
-              <select
-                value={filterModo}
-                onChange={(e) => setFilterModo(e.target.value)}
-                className="input-base text-sm py-1.5 px-3 rounded-lg"
-                style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)' }}
-              >
-                <option value="all">Todos los modos</option>
-                <option value="PRUEBA">Prueba</option>
-                <option value="PRODUCCIÓN">Producción</option>
-              </select>
+
+            <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {typeOrder.map((type) => (
+                <TypeMetric key={type} type={type} value={metrics.types[type]} />
+              ))}
             </div>
-            {(searchQuery || filterResultado !== 'all' || filterModo !== 'all') && (
-              <button
-                onClick={() => {
-                  setSearchQuery('');
-                  setFilterResultado('all');
-                  setFilterModo('all');
-                }}
-                className="btn btn-ghost btn-sm"
-                style={{ color: 'var(--brand-danger)' }}
-              >
-                Limpiar filtros
-              </button>
-            )}
           </div>
-        </Card>
 
-        {/* Stats summary */}
-        <div className="flex gap-4 text-xs">
-          <span style={{ color: 'var(--c-text-muted)' }}>
-            Total: <strong style={{ color: 'var(--c-text)' }}>{logs.length}</strong> registros
-          </span>
-          <span style={{ color: 'var(--brand-success)' }}>
-            • <strong>{logs.filter(l => l.resultado === 'ENVIADO').length}</strong> enviados
-          </span>
-          <span style={{ color: 'var(--brand-warn)' }}>
-            • <strong>{logs.filter(l => l.resultado === 'BLOQUEADO').length}</strong> bloqueados
-          </span>
-          <span style={{ color: 'var(--brand-danger)' }}>
-            • <strong>{logs.filter(l => l.resultado === 'ERROR').length}</strong> errores
-          </span>
-        </div>
+          <div className="rounded-md border border-[var(--c-border-subtle)] bg-[var(--c-surface)] p-5 shadow-[var(--c-shadow-sm)]">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md border border-[var(--brand-primary)]/25 bg-[var(--brand-primary-dim)] text-[var(--brand-primary)]">
+                <ShieldCheck size={19} />
+              </span>
+              <div>
+                <p className="font-semibold text-[var(--c-text)]">Auditoria legible</p>
+                <p className="mt-1 text-sm text-[var(--c-text-2)]">
+                  Los eventos se normalizan en seis categorias operativas y los telefonos se muestran parcialmente enmascarados.
+                </p>
+              </div>
+            </div>
 
-        {/* Table */}
-        <Table
-          columns={columns}
-          data={filteredLogs}
-          keyExtractor={(row) => row.id}
-          loading={isLoading}
-          loadingRows={8}
-          emptyMessage="No hay registros de envíos"
-          emptyIcon={<History size={40} />}
-          striped
-          hoverable
-          stickyHeader
+            <div className="mt-5 flex items-center gap-3 rounded-md border border-[var(--c-border-subtle)] bg-[var(--c-surface-raised)] p-3">
+              <Clock3 size={16} className="text-[var(--c-text-muted)]" />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase text-[var(--c-text-muted)]">Ultimo evento</p>
+                <p className="truncate text-sm text-[var(--c-text)]">
+                  {events[0] ? `${events[0].dateLabel} ${events[0].timeLabel} - ${events[0].title}` : 'Sin actividad registrada'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <AuditFilters
+          filters={filters}
+          resultCount={filteredEvents.length}
+          totalCount={events.length}
+          onChange={setFilters}
+          onReset={() => setFilters(defaultFilters)}
         />
-      </div>
+
+        {error && events.length > 0 && (
+          <div role="alert" className="flex items-start gap-3 rounded-md border border-[var(--brand-warn)]/25 bg-[var(--brand-warn-dim)] p-4 text-[var(--brand-warn-dark)]">
+            <AlertTriangle size={18} className="mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-semibold">No se pudo actualizar la auditoria</p>
+              <p className="mt-1 text-sm">Se conserva la informacion que ya estaba cargada en pantalla.</p>
+            </div>
+          </div>
+        )}
+
+        <AuditTimeline
+          events={filteredEvents}
+          loading={isLoading && events.length === 0}
+          error={timelineError}
+          onSelect={setSelectedEvent}
+          onRetry={fetchLogs}
+        />
+      </main>
+
+      <AuditEventDrawer event={selectedEvent} onClose={() => setSelectedEvent(null)} />
     </>
+  );
+}
+
+function buildAuditMetrics(events: AuditEvent[]) {
+  const types = typeOrder.reduce<Record<AuditEventType, number>>((acc, type) => {
+    acc[type] = 0;
+    return acc;
+  }, {
+    WHATSAPP: 0,
+    EMAIL: 0,
+    PAYMENT_DETECTION: 0,
+    AGENT: 0,
+    IMPORT: 0,
+    ERROR: 0,
+  });
+
+  const outcomes: Record<AuditOutcome, number> = {
+    SUCCESS: 0,
+    WARNING: 0,
+    ERROR: 0,
+    INFO: 0,
+  };
+
+  for (const event of events) {
+    types[event.type] += 1;
+    outcomes[event.outcome] += 1;
+  }
+
+  return { types, outcomes };
+}
+
+function MetricPill({ label, value, toneClass }: { label: string; value: number; toneClass: string }) {
+  return (
+    <span className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-semibold ${toneClass}`}>
+      <span className="font-mono text-sm">{value}</span>
+      {label}
+    </span>
+  );
+}
+
+function TypeMetric({ type, value }: { type: AuditEventType; value: number }) {
+  const meta = auditTypeMeta[type];
+  const Icon = meta.icon;
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md border border-[var(--c-border-subtle)] bg-[var(--c-surface-raised)] px-3 py-2">
+      <span className="flex min-w-0 items-center gap-2">
+        <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border ${meta.toneClass}`}>
+          <Icon size={15} />
+        </span>
+        <span className="truncate text-sm font-medium text-[var(--c-text)]">{meta.label}</span>
+      </span>
+      <span className="font-mono text-sm font-semibold text-[var(--c-text)]">{value}</span>
+    </div>
   );
 }

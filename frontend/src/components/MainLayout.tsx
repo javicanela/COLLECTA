@@ -1,41 +1,138 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { api } from '../services/api';
-import {
-  LayoutDashboard, Users, Upload, Download,
-  Settings, ScrollText, Sun, Moon, Menu, X,
-  Zap, AlertCircle, Wallet, ChevronRight, Home, Bot, ReceiptText,
-  ShieldCheck,
-} from 'lucide-react';
+import { Sun, Moon, Menu, X, Wallet } from 'lucide-react';
 import { useOperationStore } from '../stores/useOperationStore';
 import { useTheme } from '../hooks/useTheme';
 import { useToast } from '../hooks/useToast';
 import ToastContainer from './ui/ToastContainer';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  navigationGroups,
+  isActivePath,
+  getPageInfo,
+  type NavigationGroup,
+  type NavigationItem,
+} from './layout/navigation';
+import { PageHeader } from './layout/PageHeader';
+import { StatusRail, type RailServiceStatus, type WhatsAppConnectionStatus } from './layout/StatusRail';
+import type { DiagnosticsReadinessCheck, DiagnosticsReadinessResponse } from '../types';
 
-const menuItems = [
-  { id: 'ops',    label: 'Operaciones', icon: LayoutDashboard, path: '/' },
-  { id: 'reg',    label: 'Registros',   icon: Upload,          path: '/registros' },
-  { id: 'dir',    label: 'Directorio',  icon: Users,           path: '/directorio' },
-  { id: 'exp',    label: 'Exportar',    icon: Download,        path: '/exportar' },
-  { id: 'agent',  label: 'Agente IA',   icon: Bot,             path: '/agente' },
-  { id: 'payrev', label: 'Pagos',        icon: ReceiptText,     path: '/pagos/revision' },
-  { id: 'diag',   label: 'Diagnostico',  icon: ShieldCheck,     path: '/sistema/diagnostico' },
-  { id: 'log',    label: 'Logs',        icon: ScrollText,      path: '/logs' },
-  { id: 'conf',   label: 'Config',      icon: Settings,        path: '/config' },
-];
+/* ── MainLayout ─────────────────────────────────────────────────────────── */
 
-const pageTitles: Record<string, { title: string; subtitle: string }> = {
-  '/': { title: 'Operaciones', subtitle: 'Gestión de cobranza y seguimiento de pagos' },
-  '/registros': { title: 'Registros', subtitle: 'Importación de datos desde Excel o CSV' },
-  '/directorio': { title: 'Directorio', subtitle: 'Base de clientes del despacho' },
-  '/exportar': { title: 'Exportar', subtitle: 'Exportaciones y estadísticas' },
-  '/agente': { title: 'Agente IA', subtitle: 'Cobranza autónoma con IA' },
-  '/pagos/revision': { title: 'Confirmaciones de pago', subtitle: 'Revision de comprobantes ambiguos' },
-  '/sistema/diagnostico': { title: 'Diagnostico del sistema', subtitle: 'Readiness E2E de conectividad y automatizacion' },
-  '/logs': { title: 'Logs', subtitle: 'Historial de envíos de cobranza' },
-  '/config': { title: 'Configuración', subtitle: 'Configuración del sistema' },
-};
+interface SidebarNavProps {
+  currentPath: string;
+  isMobile: boolean;
+  vencidasCount: number;
+  onNavigate: () => void;
+}
+
+function SidebarNav({ currentPath, isMobile, vencidasCount, onNavigate }: SidebarNavProps) {
+  return (
+    <nav className="flex-1 overflow-y-auto px-3 py-3" aria-label="Navegación principal">
+      {navigationGroups.map((group: NavigationGroup) => (
+        <div key={group.id} className="mb-4">
+          <p className="mb-1 px-3 text-[10px] font-bold uppercase tracking-widest text-[var(--sidebar-text)] opacity-50">
+            {group.label}
+          </p>
+          <ul className="space-y-0.5">
+            {group.items.map((item: NavigationItem) => {
+              const active = isActivePath(item.path, currentPath);
+              const Icon = item.icon;
+              return (
+                <li key={item.id}>
+                  <Link
+                    to={item.path}
+                    onClick={isMobile ? onNavigate : undefined}
+                    className={`
+                      group flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium
+                      no-underline transition-colors
+                      ${active
+                        ? 'bg-[var(--sidebar-active-bg)] text-[var(--sidebar-text-active)]'
+                        : 'text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)] hover:text-[var(--sidebar-text-active)]'
+                      }
+                    `}
+                    aria-current={active ? 'page' : undefined}
+                  >
+                    {active && (
+                      <span
+                        className="absolute left-0 h-5 w-[3px] rounded-r-full bg-[var(--sidebar-active-bar)]"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <Icon
+                      size={16}
+                      className="flex-shrink-0 transition-colors"
+                      style={{ opacity: active ? 1 : 0.7 }}
+                    />
+                    <span className="flex-1 truncate">{item.shortLabel || item.label}</span>
+                    {item.id === 'portfolio' && vencidasCount > 0 && (
+                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--brand-danger)] px-1.5 text-[10px] font-bold text-white">
+                        {vencidasCount}
+                      </span>
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </nav>
+  );
+}
+
+interface SidebarFooterProps {
+  theme: string;
+  onToggleTheme: () => void;
+}
+
+function SidebarFooter({ theme, onToggleTheme }: SidebarFooterProps) {
+  return (
+    <div className="mt-auto border-t border-[var(--sidebar-border)] px-3 py-3">
+      <div className="flex items-center gap-2.5 px-2">
+        <div
+          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-xs font-bold text-white"
+          style={{ background: 'var(--brand-primary)' }}
+        >
+          C
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-[var(--sidebar-text-active)]">Admin</p>
+          <p className="truncate text-[10px] text-[var(--sidebar-text)] opacity-50">Administrador</p>
+        </div>
+        <button
+          onClick={onToggleTheme}
+          className="flex-shrink-0 rounded-md p-2 text-[var(--sidebar-text)] transition-colors hover:bg-[var(--sidebar-hover-bg)] hover:text-[var(--sidebar-text-active)]"
+          title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+          aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+        >
+          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function normalizeRailStatus(status?: string): RailServiceStatus {
+  if (!status) return 'unknown';
+  const normalized = status.toLowerCase();
+  if (['ok', 'pass', 'passed', 'ready'].includes(normalized)) return 'ok';
+  if (['warning', 'warn', 'degraded', 'skipped'].includes(normalized)) return 'warning';
+  if (['error', 'fail', 'failed', 'blocked'].includes(normalized)) return 'error';
+  return 'unknown';
+}
+
+function getCheckStatus(checks: DiagnosticsReadinessResponse['checks'], id: string): RailServiceStatus {
+  const list: DiagnosticsReadinessCheck[] = Array.isArray(checks)
+    ? checks
+    : Object.values(checks || {});
+  const check = list.find(item => item.id === id || item.key === id);
+
+  if (!check) return 'unknown';
+  if (typeof check.ok === 'boolean') return check.ok ? 'ok' : 'error';
+  return normalizeRailStatus(check.status);
+}
 
 export default function MainLayout() {
   const location = useLocation();
@@ -47,9 +144,14 @@ export default function MainLayout() {
   const [sysMode, setSysMode] = useState<string>(() =>
     localStorage.getItem('sys_modo') || 'PRUEBA',
   );
-  const [waStatus, setWaStatus] = useState<'connected' | 'disconnected' | 'not_configured' | 'error'>('not_configured');
+  const [waStatus, setWaStatus] = useState<WhatsAppConnectionStatus>('not_configured');
+  const [readinessStatus, setReadinessStatus] = useState<RailServiceStatus>('unknown');
+  const [emailStatus, setEmailStatus] = useState<RailServiceStatus>('unknown');
+  const [pdfStatus, setPdfStatus] = useState<RailServiceStatus>('ok');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+
+  /* ── Data fetching ──────────────────────────────────────────────────── */
 
   useEffect(() => {
     fetchOperations();
@@ -57,7 +159,7 @@ export default function MainLayout() {
 
   useEffect(() => {
     const savedModo = localStorage.getItem('sys_modo');
-    
+
     api.get<Record<string, string>>('/config').then(cfg => {
       setActiveProvider(cfg['active_api_provider'] || null);
       const modo = cfg['modo'] || cfg['sysModo'] || savedModo || 'PRUEBA';
@@ -65,7 +167,6 @@ export default function MainLayout() {
       localStorage.setItem('sys_modo', modo);
     }).catch(() => {});
 
-    // Poll WhatsApp connection status
     const pollWaStatus = () => {
       api.get<{ configured: boolean; connected: boolean; state?: string }>('/whatsapp/status')
         .then(s => {
@@ -78,6 +179,22 @@ export default function MainLayout() {
     pollWaStatus();
     const waInterval = setInterval(pollWaStatus, 30000);
 
+    const pollReadiness = () => {
+      api.get<DiagnosticsReadinessResponse>('/diagnostics/e2e-readiness')
+        .then(result => {
+          setReadinessStatus(normalizeRailStatus(result.status));
+          setEmailStatus(getCheckStatus(result.checks, 'email'));
+          setPdfStatus('ok');
+        })
+        .catch(() => {
+          setReadinessStatus('error');
+          setEmailStatus('unknown');
+          setPdfStatus('unknown');
+        });
+    };
+    pollReadiness();
+    const readinessInterval = setInterval(pollReadiness, 60000);
+
     const handleModoChange = (e: Event) => {
       const customEvent = e as CustomEvent;
       setSysMode(customEvent.detail || 'PRUEBA');
@@ -86,9 +203,12 @@ export default function MainLayout() {
     window.addEventListener('modo-changed', handleModoChange);
     return () => {
       clearInterval(waInterval);
+      clearInterval(readinessInterval);
       window.removeEventListener('modo-changed', handleModoChange);
     };
   }, []);
+
+  /* ── Responsive ─────────────────────────────────────────────────────── */
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
@@ -106,41 +226,6 @@ export default function MainLayout() {
     return () => { document.body.style.overflow = ''; };
   }, [sidebarOpen]);
 
-  const pageInfo = useMemo(() => {
-    const exact = pageTitles[location.pathname];
-    if (exact) return exact;
-    for (const [path, info] of Object.entries(pageTitles)) {
-      if (location.pathname.startsWith(path) && path !== '/') return info;
-    }
-    return { title: 'Collecta', subtitle: 'Cobranza Inteligente' };
-  }, [location.pathname]);
-
-  const isActive = (path: string) =>
-    path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
-
-  const isDark = theme === 'dark';
-  const isProductionMode = sysMode === 'PRODUCCION' || sysMode === 'PRODUCCIÓN';
-  
-  const sidebarBg = isDark 
-    ? 'rgba(15, 23, 42, 0.92)' 
-    : 'rgba(26, 31, 60, 0.92)';
-  
-  const mainBg = isDark
-    ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #134e4a 100%)'
-    : 'linear-gradient(135deg, #e0f2fe 0%, #d1fae5 50%, #a7f3d0 100%)';
-
-  const sidebarVariants = {
-    hidden: { x: -320, opacity: 0, scale: 0.96 },
-    visible: { x: 0, opacity: 1, scale: 1, transition: { type: 'spring' as const, damping: 28, stiffness: 320, mass: 0.8 } },
-    exit: { x: -320, opacity: 0, scale: 0.96, transition: { duration: 0.2, ease: 'easeInOut' as const } },
-  };
-
-  const overlayVariants = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { duration: 0.25, ease: 'easeOut' as const } },
-    exit: { opacity: 0, transition: { duration: 0.2, ease: 'easeIn' as const } },
-  };
-
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape' && sidebarOpen && isMobile) {
       setSidebarOpen(false);
@@ -152,343 +237,134 @@ export default function MainLayout() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
+  const pageInfo = getPageInfo(location.pathname);
+
+  /* ── Render ──────────────────────────────────────────────────────────── */
+
   return (
-    <div className="min-h-screen flex" style={{ background: mainBg }}>
+    <div className="flex min-h-screen bg-[var(--c-bg)]" style={{ backgroundImage: 'var(--c-bg-gradient)' }}>
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[200] focus:px-4 focus:py-2 focus:bg-brand-primary focus:text-white focus:rounded-lg focus:font-medium focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[200] focus:rounded-lg focus:bg-[var(--brand-primary)] focus:px-4 focus:py-2 focus:font-medium focus:text-white focus:outline-none focus:ring-2 focus:ring-[var(--brand-primary)] focus:ring-offset-2"
       >
         Saltar al contenido principal
       </a>
+
+      {/* ── Mobile overlay ─────────────────────────────────────────────── */}
       <AnimatePresence>
         {sidebarOpen && isMobile && (
           <motion.div
-            className="fixed inset-0 z-40"
-            style={{ background: 'rgba(0,0,0,0.6)' }}
+            className="fixed inset-0 z-40 bg-black/50"
             onClick={() => setSidebarOpen(false)}
-            variants={overlayVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
           />
         )}
       </AnimatePresence>
 
+      {/* ── Sidebar ────────────────────────────────────────────────────── */}
       <aside
         className={`
-          fixed top-0 left-0 h-full z-50 flex flex-col
-          transition-all duration-300 ease-out
-          lg:translate-x-0 lg:static lg:z-auto
+          fixed left-0 top-0 z-50 flex h-full flex-col
+          border-r border-[var(--sidebar-border)]
+          bg-[var(--sidebar-bg)] transition-transform duration-200
+          lg:static lg:z-auto lg:translate-x-0
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
-        style={{
-          width: '280px',
-        }}
+        style={{ width: 'var(--sidebar-width, 240px)' }}
       >
-        <motion.div
-          variants={sidebarVariants}
-          initial={isMobile ? 'hidden' : false}
-          animate={sidebarOpen || !isMobile ? 'visible' : 'hidden'}
-          className="h-full m-3 rounded-2xl overflow-hidden"
-          style={{
-            background: sidebarBg,
-            backdropFilter: 'blur(24px)',
-            WebkitBackdropFilter: 'blur(24px)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.25)',
-          }}
-        >
-          <div
-            className="px-5 py-5 flex-shrink-0 flex items-center justify-between"
-            style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{
-                  background: 'linear-gradient(135deg, #3B4FE8 0%, #7C3AED 100%)',
-                  boxShadow: '0 4px 12px rgba(59, 79, 232, 0.4)',
-                }}
-              >
-                <Wallet size={22} className="text-white" />
-              </div>
-              <div>
-                <h1 className="text-white font-bold text-xl tracking-tight" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
-                  Collecta
-                </h1>
-                <p className="text-xs text-white/50 font-medium mt-0.5">Cobranza Inteligente</p>
-              </div>
-            </div>
-            {isMobile && (
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-              >
-                <X size={20} />
-              </button>
-            )}
-          </div>
-
-          <nav className="flex-1 px-3 py-4 overflow-y-auto scrollbar-thin">
-            <ul className="space-y-1">
-              {menuItems.map((item, idx) => {
-                const active = isActive(item.path);
-                const Icon = item.icon;
-                return (
-                  <motion.li
-                    key={item.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.05 }}
-                  >
-                    <Link
-                      to={item.path}
-                      onClick={() => isMobile && setSidebarOpen(false)}
-                      className={`
-                        flex items-center gap-3 px-4 py-3 rounded-xl
-                        transition-all duration-200 no-underline relative group
-                        ${active 
-                          ? 'text-white' 
-                          : 'text-white/70 hover:text-white hover:bg-white/5'
-                        }
-                      `}
-                      style={{
-                        background: active ? 'linear-gradient(135deg, rgba(59,79,232,0.25), rgba(124,58,237,0.15))' : 'transparent',
-                        boxShadow: active ? '0 4px 16px rgba(59, 79, 232, 0.2), inset 0 1px 0 rgba(255,255,255,0.1)' : 'none',
-                      }}
-                    >
-                      {active && (
-                        <motion.div
-                          layoutId="activeIndicator"
-                          className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full"
-                          style={{ background: 'linear-gradient(180deg, #3B4FE8, #7C3AED)' }}
-                          initial={{ opacity: 0, scaleY: 0 }}
-                          animate={{ opacity: 1, scaleY: 1 }}
-                          transition={{ duration: 0.2 }}
-                        />
-                      )}
-                      <motion.div
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.95 }}
-                        transition={{ duration: 0.15 }}
-                      >
-                        <Icon
-                          size={18}
-                          className="transition-transform duration-200 group-hover:scale-110 flex-shrink-0"
-                          style={{ color: active ? '#fff' : 'rgba(255,255,255,0.7)' }}
-                        />
-                      </motion.div>
-                      <span className="flex-1 font-medium text-sm">{item.label}</span>
-                      {item.id === 'ops' && vencidasCount > 0 && (
-                        <motion.span
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          className="px-2 py-0.5 rounded-full text-[10px] font-bold"
-                          style={{
-                            background: 'linear-gradient(135deg, #EF3F3F, #f87171)',
-                            boxShadow: '0 2px 8px rgba(239,68,68,0.4)',
-                          }}
-                        >
-                          {vencidasCount}
-                        </motion.span>
-                      )}
-                    </Link>
-                  </motion.li>
-                );
-              })}
-            </ul>
-          </nav>
-
-          <div className="px-4 pb-4 mt-auto">
+        {/* Sidebar header */}
+        <div className="flex flex-shrink-0 items-center justify-between border-b border-[var(--sidebar-border)] px-4 py-4">
+          <div className="flex items-center gap-2.5">
             <div
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl mb-3 text-xs"
-              style={{
-                background: isProductionMode ? 'rgba(16,183,125,0.15)' : 'rgba(245,158,11,0.15)',
-                border: `1px solid ${isProductionMode ? 'rgba(16,183,125,0.25)' : 'rgba(245,158,11,0.25)'}`,
-              }}
+              className="flex h-8 w-8 items-center justify-center rounded-md"
+              style={{ background: 'var(--brand-primary)' }}
             >
-              <span
-                className="w-2 h-2 rounded-full animate-pulse"
-                style={{
-                  background: isProductionMode ? '#10B77D' : '#F59E0B',
-                  boxShadow: `0 0 8px ${isProductionMode ? '#10B77D' : '#F59E0B'}`,
-                }}
-              />
-              <span
-                className="font-bold uppercase tracking-wider"
-                style={{ color: isProductionMode ? '#10B77D' : '#F59E0B' }}
-              >
-                {sysMode}
-              </span>
+              <Wallet size={16} className="text-white" />
             </div>
-
-            <div className="flex items-center gap-2 px-4 py-2 text-white/50 text-xs font-medium">
-              {activeProvider ? (
-                <>
-                  <Zap size={14} style={{ color: '#10B77D' }} />
-                  <span>{activeProvider}</span>
-                </>
-              ) : (
-                <>
-                  <AlertCircle size={14} style={{ color: '#EF3F3F' }} />
-                  <span>Sin API</span>
-                </>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2 px-4 py-2 text-white/50 text-xs font-medium mb-3">
-              <span
-                className="w-2 h-2 rounded-full flex-shrink-0"
-                style={{
-                  background: waStatus === 'connected' ? '#25D366' : waStatus === 'error' ? '#F59E0B' : waStatus === 'disconnected' ? '#EF3F3F' : '#6B7280',
-                  boxShadow: waStatus === 'connected' ? '0 0 6px #25D366' : 'none',
-                }}
-              />
-              <span>
-                WA {waStatus === 'connected' ? 'Conectado' : waStatus === 'error' ? 'Error' : waStatus === 'disconnected' ? 'Desconectado' : 'No config.'}
-              </span>
-            </div>
-
-            <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent my-3" />
-
-            <div className="flex items-center gap-3 px-2">
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0"
-                style={{
-                  background: 'linear-gradient(135deg, #3B4FE8, #7C3AED)',
-                  boxShadow: '0 2px 8px rgba(59, 79, 232, 0.4)',
-                  color: 'white',
-                }}
-              >
-                C
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-white font-semibold text-sm truncate">Admin</p>
-                <p className="text-white/40 text-xs truncate">Administrador</p>
-              </div>
-              <motion.button
-                onClick={toggleTheme}
-                className="p-2.5 rounded-xl transition-all hover:bg-white/10 relative overflow-hidden flex-shrink-0"
-                title={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-                whileHover={{ scale: 1.08, backgroundColor: 'rgba(255,255,255,0.12)' }}
-                whileTap={{ scale: 0.95 }}
-                aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-              >
-                <motion.div
-                  initial={false}
-                  animate={{ rotate: theme === 'dark' ? 180 : 0 }}
-                  transition={{ duration: 0.3, ease: 'easeInOut' }}
-                >
-                  {theme === 'dark' ? (
-                    <Sun size={16} style={{ color: '#F59E0B' }} />
-                  ) : (
-                    <Moon size={16} style={{ color: '#7C3AED' }} />
-                  )}
-                </motion.div>
-              </motion.button>
+            <div>
+              <h1 className="text-sm font-bold tracking-tight text-[var(--sidebar-text-active)]">
+                Collecta
+              </h1>
+              <p className="text-[10px] text-[var(--sidebar-text)] opacity-50">Cobranza Inteligente</p>
             </div>
           </div>
-        </motion.div>
+          {isMobile && (
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="rounded-md p-1.5 text-[var(--sidebar-text)] transition-colors hover:bg-[var(--sidebar-hover-bg)] hover:text-[var(--sidebar-text-active)]"
+              aria-label="Cerrar menú"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
+
+        <SidebarNav
+          currentPath={location.pathname}
+          isMobile={isMobile}
+          vencidasCount={vencidasCount}
+          onNavigate={() => setSidebarOpen(false)}
+        />
+        <SidebarFooter theme={theme} onToggleTheme={toggleTheme} />
       </aside>
 
-      <div className="flex-1 flex flex-col min-h-screen lg:ml-0">
-        <header
-          className="lg:hidden flex items-center justify-between px-4 py-3 sticky top-0 z-30"
-          style={{
-            background: isDark ? 'rgba(15,23,42,0.92)' : 'rgba(255,255,255,0.2)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
-          }}
-        >
-          <div className="flex items-center gap-3">
-            <motion.button 
-              onClick={() => setSidebarOpen(true)} 
-              className="p-2.5 rounded-xl text-white/90 hover:text-white hover:bg-white/10 transition-all"
-              whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.1)' }}
-              whileTap={{ scale: 0.95 }}
+      {/* ── Main content area ──────────────────────────────────────────── */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Mobile top bar */}
+        <header className="flex items-center justify-between border-b border-[var(--c-border-subtle)] bg-[var(--c-surface)] px-4 py-3 lg:hidden">
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="rounded-md p-2 text-[var(--c-text-2)] transition-colors hover:bg-[var(--c-surface-raised)] hover:text-[var(--c-text)]"
               aria-label="Abrir menú"
             >
-              <Menu size={22} />
-            </motion.button>
-            <div className="flex items-center gap-2.5">
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center shadow-lg"
-                style={{
-                  background: 'linear-gradient(135deg, #3B4FE8 0%, #7C3AED 100%)',
-                  boxShadow: '0 2px 10px rgba(59,79,232,0.4)',
-                }}
-              >
-                <Wallet size={18} className="text-white" />
-              </div>
-              <span className="text-white font-bold text-lg tracking-tight">Collecta</span>
-            </div>
+              <Menu size={20} />
+            </button>
+            <span className="text-sm font-bold text-[var(--c-text)]">Collecta</span>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             {vencidasCount > 0 && (
-              <motion.span
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="px-2.5 py-1 rounded-full text-[10px] font-bold shadow-sm"
-                style={{
-                  background: 'linear-gradient(135deg, #EF3F3F, #f87171)',
-                  boxShadow: '0 2px 8px rgba(239,68,68,0.4)',
-                }}
-              >
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--brand-danger)] px-1.5 text-[10px] font-bold text-white">
                 {vencidasCount}
-              </motion.span>
+              </span>
             )}
-            <motion.button
+            <button
               onClick={toggleTheme}
-              className="p-2.5 rounded-xl text-white/90 hover:text-white hover:bg-white/10 transition-all"
-              whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.1)' }}
-              whileTap={{ scale: 0.95 }}
+              className="rounded-md p-2 text-[var(--c-text-2)] transition-colors hover:bg-[var(--c-surface-raised)] hover:text-[var(--c-text)]"
               title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
               aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
             >
-              <motion.div
-                animate={{ rotate: theme === 'dark' ? 180 : 0 }}
-                transition={{ duration: 0.3, ease: 'easeInOut' }}
-              >
-                {theme === 'dark' ? <Sun size={18} style={{ color: '#F59E0B' }} /> : <Moon size={18} style={{ color: '#7C3AED' }} />}
-              </motion.div>
-            </motion.button>
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
           </div>
         </header>
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="hidden lg:flex items-center gap-2 px-6 py-3"
-            style={{
-              background: isDark ? 'rgba(15,23,42,0.5)' : 'rgba(255,255,255,0.12)',
-              backdropFilter: 'blur(12px)',
-              borderBottom: '1px solid rgba(255,255,255,0.06)',
-            }}
-          >
-            <Link 
-              to="/" 
-              className="text-xs text-white/50 hover:text-white transition-colors flex items-center gap-1.5 no-underline"
-            >
-              <Home size={12} />
-              Inicio
-            </Link>
-            <ChevronRight size={12} className="text-white/25" />
-            <span className="text-xs font-medium text-white/75">{pageInfo.title}</span>
-          </motion.div>
-        </AnimatePresence>
+        {/* Page header + status rail (desktop) */}
+        <div className="flex-shrink-0 space-y-3 border-b border-[var(--c-border-subtle)] bg-[var(--c-surface-glass)] px-4 py-4 sm:px-5 lg:px-6" style={{ backdropFilter: 'blur(12px)' }}>
+          <div className="mx-auto max-w-7xl space-y-3">
+            <PageHeader title={pageInfo.title} subtitle={pageInfo.subtitle} />
+            <StatusRail
+              sysMode={sysMode}
+              waStatus={waStatus}
+              activeProvider={activeProvider}
+              readinessStatus={readinessStatus}
+              emailStatus={emailStatus}
+              pdfStatus={pdfStatus}
+            />
+          </div>
+        </div>
 
+        {/* Main content */}
         <main id="main-content" className="flex-1 overflow-auto p-4 sm:p-5 lg:p-6">
           <motion.div
             key={location.pathname}
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="max-w-7xl mx-auto"
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="mx-auto max-w-7xl"
           >
             <Outlet />
           </motion.div>

@@ -18,6 +18,8 @@ interface ButtonProps {
   type?: 'button' | 'submit' | 'reset';
   onClick?: () => void;
   title?: string;
+  'aria-disabled'?: boolean;
+  'aria-describedby'?: string;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -97,6 +99,8 @@ interface IconButtonProps {
   title?: string;
   type?: 'button' | 'submit' | 'reset';
   onClick?: () => void;
+  'aria-disabled'?: boolean;
+  'aria-describedby'?: string;
 }
 
 export const IconButton: React.FC<IconButtonProps> = ({

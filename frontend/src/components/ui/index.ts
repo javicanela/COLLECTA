@@ -17,6 +17,8 @@ export { SegmentedControl } from './SegmentedControl';
 export type { SegmentedControlOption, SegmentedControlProps } from './SegmentedControl';
 export { StateBlock } from './StateBlock';
 export type { StateBlockProps } from './StateBlock';
+export { SidePanel } from './SidePanel';
+export type { SidePanelProps } from './SidePanel';
 export { Toolbar } from './Toolbar';
 export type { ToolbarProps } from './Toolbar';
 export { getOperationStatusTone, getToneClasses, normalizeStatusKey } from './statusTone';

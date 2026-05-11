@@ -1,254 +1,323 @@
-import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ReceiptText, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
 import Topbar from '../components/Topbar';
-import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
+import { InlineAlert } from '../components/ui/InlineAlert';
+import { Skeleton } from '../components/ui/Skeleton';
+import { StateBlock } from '../components/ui/StateBlock';
+import { PaymentCandidateList } from '../components/payments/PaymentCandidateList';
+import { PaymentEvidencePanel } from '../components/payments/PaymentEvidencePanel';
+import { PaymentConfidenceBadge } from '../components/payments/PaymentConfidenceBadge';
+import { PaymentReviewQueue } from '../components/payments/PaymentReviewQueue';
 import { PaymentDetectionService } from '../services/paymentDetectionService';
-import type { PaymentReviewItem } from '../types';
+import type { PaymentReviewCandidate, PaymentReviewItem } from '../types';
 
-const money = (value?: number | null) =>
-  new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value || 0);
+interface LoadReviewOptions {
+  showLoading?: boolean;
+  clearNotice?: boolean;
+}
 
-const dateLabel = (iso?: string | null) => {
-  if (!iso) return 'Sin fecha';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
-};
+const missingEvidenceReasons = new Set([
+  'missing_rfc',
+  'missing_amount',
+  'missing_payment_date',
+  'rfc_not_found',
+]);
 
-function reasonLabel(reason: string) {
-  const labels: Record<string, string> = {
-    missing_rfc: 'RFC faltante',
-    missing_amount: 'Monto faltante',
-    missing_payment_date: 'Fecha faltante',
-    rfc_not_found: 'RFC no encontrado',
-    no_safe_operation_match: 'Sin match seguro',
-    ambiguous_operation_match: 'Match ambiguo',
-    duplicate_receipt: 'Duplicado',
-  };
-  return labels[reason] || reason.replace(/_/g, ' ');
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function toApiPaymentDate(value?: string | null) {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return parsed.toISOString().slice(0, 10);
+}
+
+function hasMissingEvidence(item: PaymentReviewItem) {
+  const reasons = item.payload.reasons || [];
+  return (
+    !item.payload.rfc ||
+    item.payload.amount === null ||
+    item.payload.amount === undefined ||
+    !item.payload.paymentDate ||
+    reasons.some(reason => missingEvidenceReasons.has(reason))
+  );
+}
+
+function PaymentReviewLoading() {
+  return (
+    <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)_minmax(360px,0.9fr)]">
+      <section className="rounded-md border border-[var(--c-border-subtle)] bg-[var(--c-surface)] p-4">
+        <Skeleton variant="text" width="45%" height={16} />
+        <div className="mt-5 space-y-3">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton key={index} variant="rectangle" height={96} rounded={8} />
+          ))}
+        </div>
+      </section>
+      <section className="rounded-md border border-[var(--c-border-subtle)] bg-[var(--c-surface)] p-4">
+        <Skeleton variant="text" width="40%" height={16} />
+        <div className="mt-5 space-y-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <Skeleton key={index} variant="rectangle" height={48} rounded={8} />
+          ))}
+        </div>
+      </section>
+      <section className="rounded-md border border-[var(--c-border-subtle)] bg-[var(--c-surface)] p-4">
+        <Skeleton variant="text" width="36%" height={16} />
+        <div className="mt-5 space-y-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Skeleton key={index} variant="rectangle" height={112} rounded={8} />
+          ))}
+        </div>
+      </section>
+    </div>
+  );
 }
 
 export default function PaymentReviewView() {
   const [items, setItems] = useState<PaymentReviewItem[]>([]);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [pendingCandidateId, setPendingCandidateId] = useState<string | null>(null);
+  const [confirmingCandidateId, setConfirmingCandidateId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [confirmingId, setConfirmingId] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
 
-  const fetchReview = () => {
-    setIsLoading(true);
-    setMessage(null);
-    PaymentDetectionService.getReviewReport()
-      .then(report => setItems(report.pending))
-      .catch((error: Error) => setMessage(error.message))
-      .finally(() => setIsLoading(false));
-  };
+  const fetchReview = useCallback(async ({
+    showLoading = true,
+    clearNotice = true,
+  }: LoadReviewOptions = {}) => {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
 
-  useEffect(() => {
-    fetchReview();
+    if (showLoading) setIsLoading(true);
+    setErrorMessage(null);
+    if (clearNotice) setNotice(null);
+
+    try {
+      const report = await PaymentDetectionService.getReviewReport();
+      if (requestId !== requestIdRef.current) return;
+
+      const pending = Array.isArray(report.pending) ? report.pending : [];
+      setItems(pending);
+      setSelectedItemId(current => (
+        current && pending.some(item => item.id === current)
+          ? current
+          : pending[0]?.id ?? null
+      ));
+      setPendingCandidateId(null);
+    } catch (error) {
+      if (requestId !== requestIdRef.current) return;
+      setErrorMessage(getErrorMessage(error, 'No se pudo cargar el reporte de pagos.'));
+    } finally {
+      if (requestId === requestIdRef.current) {
+        setIsLoading(false);
+      }
+    }
   }, []);
 
+  useEffect(() => {
+    void fetchReview();
+  }, [fetchReview]);
+
+  const selectedItem = useMemo(() => {
+    if (!items.length) return null;
+    return items.find(item => item.id === selectedItemId) || items[0];
+  }, [items, selectedItemId]);
+
   const stats = useMemo(() => {
-    const withClient = items.filter(item => item.client).length;
+    const duplicateRisk = items.filter(item => PaymentConfidenceBadge.getSignals(item.payload).hasDuplicateRisk).length;
+    const uncertain = items.filter(item => PaymentConfidenceBadge.getSignals(item.payload).hasUncertainty).length;
     const withCandidates = items.filter(item => item.candidates.length > 0).length;
-    return { total: items.length, withClient, withCandidates };
+    const missingEvidence = items.filter(hasMissingEvidence).length;
+
+    return {
+      total: items.length,
+      withCandidates,
+      duplicateRisk,
+      uncertain,
+      missingEvidence,
+    };
   }, [items]);
 
-  const confirmCandidate = async (item: PaymentReviewItem, operationId: string) => {
-    setConfirmingId(operationId);
-    setMessage(null);
+  const selectItem = (item: PaymentReviewItem) => {
+    setSelectedItemId(item.id);
+    setPendingCandidateId(null);
+    setNotice(null);
+  };
+
+  const confirmCandidate = async (candidate: PaymentReviewCandidate) => {
+    if (!selectedItem) {
+      setErrorMessage('Selecciona un comprobante antes de confirmar.');
+      return;
+    }
+
+    if (pendingCandidateId !== candidate.id) {
+      setPendingCandidateId(candidate.id);
+      return;
+    }
+
+    setConfirmingCandidateId(candidate.id);
+    setErrorMessage(null);
+    setNotice(null);
+
     try {
       await PaymentDetectionService.confirmReview({
-        operationId,
-        paymentDate: item.payload.paymentDate || undefined,
-        reference: item.payload.reference || undefined,
-        receiptId: item.payload.receiptKey || undefined,
+        operationId: candidate.id,
+        paymentDate: toApiPaymentDate(selectedItem.payload.paymentDate),
+        reference: selectedItem.payload.reference || undefined,
+        receiptId: selectedItem.payload.receiptKey || undefined,
       });
-      setMessage('Pago confirmado manualmente.');
-      fetchReview();
-    } catch (error: any) {
-      setMessage(error.message || 'No se pudo confirmar el pago.');
+      setNotice('Pago confirmado manualmente. La cola fue actualizada.');
+      await fetchReview({ showLoading: false, clearNotice: false });
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error, 'No se pudo confirmar el pago.'));
     } finally {
-      setConfirmingId(null);
+      setConfirmingCandidateId(null);
     }
+  };
+
+  const renderMainState = () => {
+    if (isLoading && items.length === 0) {
+      return <PaymentReviewLoading />;
+    }
+
+    if (errorMessage && items.length === 0) {
+      return (
+        <StateBlock
+          state="error"
+          title="No se pudo cargar la cola de pagos"
+          description={errorMessage}
+          action={(
+            <Button
+              variant="blue"
+              size="sm"
+              leftIcon={<RefreshCw size={14} />}
+              onClick={() => void fetchReview()}
+            >
+              Reintentar
+            </Button>
+          )}
+        />
+      );
+    }
+
+    if (!isLoading && items.length === 0) {
+      return (
+        <StateBlock
+          state="success"
+          title="Sin pagos pendientes de revision"
+          description="No hay comprobantes ambiguos esperando confirmacion manual."
+          icon={<CheckCircle2 size={22} />}
+        />
+      );
+    }
+
+    if (!selectedItem) {
+      return (
+        <StateBlock
+          state="idle"
+          title="Selecciona un comprobante"
+          description="La evidencia y los candidatos apareceran al seleccionar un elemento de la cola."
+        />
+      );
+    }
+
+    return (
+      <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)_minmax(360px,0.9fr)]">
+        <PaymentReviewQueue
+          items={items}
+          selectedItemId={selectedItem.id}
+          onSelectItem={selectItem}
+          className="xl:min-h-[620px]"
+        />
+        <PaymentEvidencePanel item={selectedItem} className="xl:min-h-[620px]" />
+        <PaymentCandidateList
+          candidates={selectedItem.candidates}
+          pendingCandidateId={pendingCandidateId}
+          confirmingCandidateId={confirmingCandidateId}
+          onRequestConfirm={candidate => setPendingCandidateId(candidate.id)}
+          onCancelConfirm={() => setPendingCandidateId(null)}
+          onConfirm={candidate => void confirmCandidate(candidate)}
+          className="xl:min-h-[620px]"
+        />
+      </div>
+    );
   };
 
   return (
     <>
       <Topbar
-        title="Confirmaciones de pago"
-        subtitle="Comprobantes ambiguos o incompletos que requieren revision"
-        actions={
-          <button
-            onClick={fetchReview}
-            disabled={isLoading}
-            className="btn btn-ghost btn-sm gap-2"
+        title="Revision de pagos"
+        subtitle="Cola operativa para resolver comprobantes ambiguos antes de marcar operaciones como pagadas"
+        actions={(
+          <Button
+            variant="ghost"
+            size="sm"
+            loading={isLoading}
+            disabled={!!confirmingCandidateId}
+            leftIcon={<RefreshCw size={14} />}
+            onClick={() => void fetchReview()}
           >
-            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
             Actualizar
-          </button>
-        }
+          </Button>
+        )}
       />
 
-      <div className="p-5 max-w-7xl mx-auto w-full flex flex-col gap-4">
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card variant="glass" padding="normal">
-            <p className="text-xs font-semibold uppercase" style={{ color: 'var(--c-text-muted)' }}>
-              Pendientes
-            </p>
-            <p className="mt-2 text-3xl font-bold" style={{ color: 'var(--c-text)' }}>
-              {stats.total}
-            </p>
-          </Card>
-          <Card variant="glass" padding="normal">
-            <p className="text-xs font-semibold uppercase" style={{ color: 'var(--c-text-muted)' }}>
-              Con cliente
-            </p>
-            <p className="mt-2 text-3xl font-bold" style={{ color: 'var(--c-text)' }}>
-              {stats.withClient}
-            </p>
-          </Card>
-          <Card variant="glass" padding="normal">
-            <p className="text-xs font-semibold uppercase" style={{ color: 'var(--c-text-muted)' }}>
-              Con candidatos
-            </p>
-            <p className="mt-2 text-3xl font-bold" style={{ color: 'var(--c-text)' }}>
-              {stats.withCandidates}
-            </p>
-          </Card>
-        </div>
-
-        {message && (
-          <Card variant="glass" padding="sm">
-            <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--c-text)' }}>
-              <AlertTriangle size={16} />
-              {message}
+      <main className="mx-auto flex w-full max-w-[1400px] flex-col gap-4 p-4 sm:p-5 lg:p-6">
+        <section
+          aria-label="Resumen de revision de pagos"
+          className="grid overflow-hidden rounded-md border border-[var(--c-border-subtle)] bg-[var(--c-surface)] sm:grid-cols-2 xl:grid-cols-5"
+        >
+          {[
+            ['Pendientes', stats.total],
+            ['Con candidatos', stats.withCandidates],
+            ['Duplicado posible', stats.duplicateRisk],
+            ['Con incertidumbre', stats.uncertain],
+            ['Evidencia incompleta', stats.missingEvidence],
+          ].map(([label, value]) => (
+            <div key={label} className="border-b border-[var(--c-border-subtle)] px-4 py-3 sm:border-r xl:border-b-0">
+              <p className="text-xs font-semibold uppercase text-[var(--c-text-muted)]">{label}</p>
+              <p className="mt-1 font-mono text-2xl font-semibold text-[var(--c-text)]">{value}</p>
             </div>
-          </Card>
+          ))}
+        </section>
+
+        {notice && (
+          <InlineAlert tone="success" title="Confirmacion registrada" compact>
+            {notice}
+          </InlineAlert>
         )}
 
-        {isLoading ? (
-          <Card variant="glass" padding="lg">
-            <div className="flex items-center gap-3" style={{ color: 'var(--c-text-muted)' }}>
-              <RefreshCw size={18} className="animate-spin" />
-              Cargando confirmaciones pendientes...
-            </div>
-          </Card>
-        ) : items.length === 0 ? (
-          <Card variant="glass" padding="xl">
-            <div className="flex flex-col items-center text-center gap-3">
-              <CheckCircle2 size={42} style={{ color: 'var(--brand-success)' }} />
-              <div>
-                <h3 className="text-lg font-semibold" style={{ color: 'var(--c-text)' }}>
-                  Sin confirmaciones pendientes
-                </h3>
-                <p className="text-sm mt-1" style={{ color: 'var(--c-text-muted)' }}>
-                  Los intentos ambiguos apareceran aqui para revision.
-                </p>
-              </div>
-            </div>
-          </Card>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {items.map(item => (
-              <Card key={item.id} variant="glass" padding="normal">
-                <div className="flex flex-col gap-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div
-                        className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{ background: 'rgba(245,158,11,0.14)', color: 'var(--brand-warn)' }}
-                      >
-                        <ReceiptText size={20} />
-                      </div>
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-semibold" style={{ color: 'var(--c-text)' }}>
-                            {item.client?.nombre || item.payload.rfc || 'Comprobante sin cliente'}
-                          </h3>
-                          <Badge status="PENDIENTE" size="sm" />
-                        </div>
-                        <p className="text-xs mt-1" style={{ color: 'var(--c-text-muted)' }}>
-                          {dateLabel(item.createdAt)} · RFC {item.client?.rfc || item.payload.rfc || 'N/D'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xl font-bold" style={{ color: 'var(--c-text)' }}>
-                        {money(item.payload.amount)}
-                      </p>
-                      <p className="text-xs" style={{ color: 'var(--c-text-muted)' }}>
-                        Pago {dateLabel(item.payload.paymentDate)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {(item.payload.reasons || []).map(reason => (
-                      <span
-                        key={reason}
-                        className="px-2 py-1 rounded-md text-xs font-medium"
-                        style={{
-                          background: 'rgba(245,158,11,0.12)',
-                          color: 'var(--brand-warn)',
-                        }}
-                      >
-                        {reasonLabel(reason)}
-                      </span>
-                    ))}
-                    {item.payload.reference && (
-                      <span className="px-2 py-1 rounded-md text-xs font-mono" style={{ background: 'var(--c-surface)', color: 'var(--c-text-muted)' }}>
-                        Ref {item.payload.reference}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="border-t pt-4" style={{ borderColor: 'var(--c-border-subtle)' }}>
-                    <p className="text-xs font-semibold uppercase mb-3" style={{ color: 'var(--c-text-muted)' }}>
-                      Operaciones candidatas
-                    </p>
-                    {item.candidates.length === 0 ? (
-                      <p className="text-sm" style={{ color: 'var(--c-text-muted)' }}>
-                        No hay operaciones pendientes sugeridas para este comprobante.
-                      </p>
-                    ) : (
-                      <div className="grid gap-2">
-                        {item.candidates.map(candidate => (
-                          <div
-                            key={candidate.id}
-                            className="flex flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2"
-                            style={{ background: 'var(--c-surface)' }}
-                          >
-                            <div>
-                              <p className="font-semibold text-sm" style={{ color: 'var(--c-text)' }}>
-                                {candidate.tipo} · {money(candidate.monto)}
-                              </p>
-                              <p className="text-xs" style={{ color: 'var(--c-text-muted)' }}>
-                                Vence {dateLabel(candidate.fechaVence)} · {candidate.descripcion || 'Sin descripcion'}
-                              </p>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="green"
-                              loading={confirmingId === candidate.id}
-                              disabled={!!confirmingId}
-                              leftIcon={<CheckCircle2 size={14} />}
-                              onClick={() => confirmCandidate(item, candidate.id)}
-                            >
-                              Confirmar
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+        {errorMessage && items.length > 0 && (
+          <InlineAlert
+            tone="danger"
+            title="Hubo un problema"
+            icon={<AlertTriangle size={16} />}
+            action={(
+              <Button
+                variant="red"
+                size="sm"
+                leftIcon={<RefreshCw size={14} />}
+                onClick={() => void fetchReview()}
+              >
+                Reintentar
+              </Button>
+            )}
+            compact
+          >
+            {errorMessage}
+          </InlineAlert>
         )}
-      </div>
+
+        {renderMainState()}
+      </main>
     </>
   );
 }

@@ -6,7 +6,7 @@ import { parsedDocumentToWorkbookSheets } from '../domain/parsed-document-to-wor
 import { runSmartImportEscalation } from '../domain/provider-registry';
 import { buildCanonicalRows } from '../domain/super-identifier';
 import type { SourceFileKind } from '../domain/parsed-document';
-import type { CanonicalField, MappingCandidate, SmartImportAnalysis, SmartImportSource, WorkbookSheetSummary } from '../domain/types';
+import type { CanonicalField, CanonicalImportRow, MappingCandidate, SmartImportAnalysis, SmartImportSource, WorkbookSheetSummary } from '../domain/types';
 import { extractDocument } from '../extractors/extract-document';
 import { ImportSummary } from './ImportSummary';
 import { MappingReviewTable } from './MappingReviewTable';
@@ -30,7 +30,12 @@ function correctionsFromMappings(mappings: MappingCandidate[]): Record<number, C
   return Object.fromEntries(mappings.map((mapping) => [mapping.columnIndex, mapping.field])) as Record<number, CanonicalField | ''>;
 }
 
-export function ImportWizard() {
+export interface ImportWizardProps {
+  onCommit?: (rows: CanonicalImportRow[]) => Promise<void>;
+  isCommitting?: boolean;
+}
+
+export function ImportWizard({ onCommit, isCommitting }: ImportWizardProps = {}) {
   const [source, setSource] = useState<SmartImportSource | null>(null);
   const [sheets, setSheets] = useState<WorkbookSheetSummary[]>([]);
   const [analysis, setAnalysis] = useState<SmartImportAnalysis | null>(null);
@@ -143,6 +148,10 @@ export function ImportWizard() {
   const lowConfidenceCount = useMemo(() => (
     effectiveMappings.filter((mapping) => mapping.field !== 'ignore' && mapping.confidence < 0.65).length
   ), [effectiveMappings]);
+
+  const blockingRowCount = useMemo(() => (
+    previewRows.filter((row) => (!row.client.rfc && !row.client.nombre) || !row.operation.fechaVence).length
+  ), [previewRows]);
 
   const handleSelectSheet = useCallback((sheetId: string) => {
     if (!source) return;
@@ -266,7 +275,25 @@ export function ImportWizard() {
           </div>
 
           <div>
-            <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--c-text)' }}>Preview canonico</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold" style={{ color: 'var(--c-text)' }}>Preview canonico</h3>
+              {onCommit && (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm px-6"
+                  disabled={isCommitting || previewRows.length === 0 || blockingRowCount > 0}
+                  title={blockingRowCount > 0 ? 'Resuelve filas sin cliente o fecha antes de importar' : undefined}
+                  onClick={() => { void onCommit(previewRows); }}
+                >
+                  {isCommitting ? 'Importando...' : 'Confirmar e Importar'}
+                </button>
+              )}
+            </div>
+            {blockingRowCount > 0 && (
+              <div className="mb-3 rounded-lg border px-4 py-3 text-sm" style={{ borderColor: 'rgba(239,63,63,0.24)', color: 'var(--brand-danger)', background: 'rgba(239,63,63,0.08)' }}>
+                {blockingRowCount} fila{blockingRowCount === 1 ? '' : 's'} sin cliente o fecha de vencimiento. Ajusta el mapeo antes de importar.
+              </div>
+            )}
             <PreviewGrid rows={previewRows} />
           </div>
         </div>
