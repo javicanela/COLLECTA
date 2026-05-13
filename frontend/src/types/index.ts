@@ -8,6 +8,7 @@ export interface User {
   name: string;
   email?: string | null;
   role: string;
+  authSource?: string;
   createdAt?: string;
   updatedAt?: string;
 }

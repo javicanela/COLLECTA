@@ -52,6 +52,17 @@ vi.mock('../lib/prisma', () => ({
         db.messages.push(record);
         return record;
       }),
+      findFirst: vi.fn(async ({ where }: any) =>
+        db.messages.find(message => {
+          const clientOk = where?.clientId ? message.clientId === where.clientId : true;
+          const directionOk = where?.direction ? message.direction === where.direction : true;
+          const phoneOk = where?.phone?.contains ? String(message.phone || '').includes(where.phone.contains) : true;
+          return clientOk && directionOk && phoneOk;
+        }) ?? null
+      ),
+    },
+    operation: {
+      findMany: vi.fn(async () => []),
     },
     logEntry: {
       create: vi.fn(async ({ data }: any) => {
@@ -59,6 +70,16 @@ vi.mock('../lib/prisma', () => ({
         db.logs.push(record);
         return record;
       }),
+      findFirst: vi.fn(async ({ where }: any) =>
+        db.logs.find(log => {
+          const typeOk = where?.tipo ? log.tipo === where.tipo : true;
+          const resultOk = where?.resultado ? log.resultado === where.resultado : true;
+          const messageOk = where?.mensaje?.contains
+            ? String(log.mensaje || '').includes(where.mensaje.contains)
+            : true;
+          return typeOk && resultOk && messageOk;
+        }) ?? null
+      ),
     },
   },
 }));

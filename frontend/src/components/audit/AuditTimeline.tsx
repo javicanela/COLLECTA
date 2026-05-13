@@ -229,6 +229,7 @@ export function normalizeAuditEvent(log: LogEntry): AuditEvent {
   const type = classifyAuditEvent(log);
   const outcome = classifyOutcome(rawResult);
   const sanitizedMessage = redactAuditText(log.mensaje, log.telefono);
+  const displayMessage = formatAuditMessage(sanitizedMessage);
   const clientName = log.client?.nombre?.trim() || 'Sin cliente asociado';
   const clientRfc = log.client?.rfc?.trim() || 'Sin RFC';
   const channelLabel = channelFromEvent(type, rawType, rawVariant);
@@ -256,7 +257,7 @@ export function normalizeAuditEvent(log: LogEntry): AuditEvent {
     type,
     title,
     summary,
-    message: sanitizedMessage,
+    message: displayMessage,
     rawType,
     rawResult,
     rawVariant,
@@ -560,6 +561,9 @@ function channelFromEvent(type: AuditEventType, rawType: string, rawVariant: str
 function parseMessageDetails(message: string): DetailRow[] {
   if (!message) return [];
 
+  const payload = parseJsonAuditPayload(message);
+  if (payload) return payloadToDetailRows(payload);
+
   const rows = message
     .split('|')
     .map((part) => part.trim())
@@ -574,6 +578,52 @@ function parseMessageDetails(message: string): DetailRow[] {
     });
 
   return rows.length > 0 ? rows : [['Mensaje', message]];
+}
+
+function parseJsonAuditPayload(message: string): Record<string, unknown> | null {
+  if (!message.trim().startsWith('{')) return null;
+
+  try {
+    const parsed = JSON.parse(message);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatAuditMessage(message: string): string {
+  const payload = parseJsonAuditPayload(message);
+  if (!payload) return message;
+
+  if (payload.event === 'whatsapp_payment_confirmation_correlation') {
+    const reasons = Array.isArray(payload.reasons) ? payload.reasons.join(', ') : 'sin motivos capturados';
+    return `Confirmacion WhatsApp evaluada: ${reasons}`;
+  }
+
+  if (payload.event === 'payment_detection_manual_confirmation') {
+    return 'Pago confirmado manualmente desde revision';
+  }
+
+  return payload.event ? String(payload.event) : 'Evento estructurado';
+}
+
+function payloadToDetailRows(payload: Record<string, unknown>): DetailRow[] {
+  const rows: Array<DetailRow | null> = [
+    typeof payload.operationId === 'string' ? ['Operacion', payload.operationId] : null,
+    payload.amount != null ? ['Monto detectado', String(payload.amount)] : null,
+    typeof payload.paymentDate === 'string' ? ['Fecha pago', payload.paymentDate] : null,
+    typeof payload.reference === 'string' ? ['Referencia', payload.reference] : null,
+    typeof payload.receiptId === 'string' ? ['Recibo', payload.receiptId] : null,
+    typeof payload.sourceMessageId === 'string' ? ['Mensaje WhatsApp', payload.sourceMessageId] : null,
+    typeof payload.phoneLast4 === 'string' ? ['Telefono', `******${payload.phoneLast4}`] : null,
+    Array.isArray(payload.reasons) ? ['Motivos', payload.reasons.join(', ')] : null,
+    payload.confidence != null ? ['Confianza', String(payload.confidence)] : null,
+    typeof payload.textSample === 'string' ? ['Muestra', payload.textSample] : null,
+  ];
+
+  return rows.filter((row): row is DetailRow => Boolean(row));
 }
 
 function labelForMessageKey(key: string): string {

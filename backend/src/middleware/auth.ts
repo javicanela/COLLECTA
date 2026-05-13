@@ -1,6 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import * as jwt from 'jsonwebtoken';
+import { verifyProviderToken } from '../services/authProvider';
+import {
+  AuthenticatedPrincipal,
+  normalizePrincipalRole,
+} from '../services/authTypes';
+
+export type { AuthenticatedPrincipal } from '../services/authTypes';
 
 function timingSafeEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
@@ -11,7 +18,18 @@ function timingSafeEqual(a: string, b: string): boolean {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
+function localPrincipalFromJwt(decoded: { userId?: string; email?: string; role?: string }): AuthenticatedPrincipal | null {
+  if (!decoded.userId) return null;
+
+  return {
+    userId: decoded.userId,
+    email: decoded.email,
+    role: normalizePrincipalRole(decoded.role, 'viewer'),
+    authSource: 'local',
+  };
+}
+
+export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const API_KEY = process.env.API_KEY;
   const JWT_SECRET = process.env.JWT_SECRET;
   const requestId = crypto.randomUUID();
@@ -29,15 +47,36 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as {
         userId: string;
-        email: string;
-        role: string;
+        email?: string;
+        role?: string;
       };
-      (req as any).user = decoded;
-      next();
-      return;
+      const principal = localPrincipalFromJwt(decoded);
+      if (principal) {
+        (req as any).user = principal;
+        next();
+        return;
+      }
     } catch {
-      // JWT verification failed — fall through to API_KEY check
+      // Continue with service/provider auth checks.
     }
+  }
+
+  if (API_KEY && timingSafeEqual(token, API_KEY)) {
+    (req as any).user = {
+      userId: 'api-key',
+      email: 'automation@collecta.local',
+      role: 'service',
+      authSource: 'api_key',
+    } satisfies AuthenticatedPrincipal;
+    next();
+    return;
+  }
+
+  const providerPrincipal = await verifyProviderToken(token);
+  if (providerPrincipal) {
+    (req as any).user = providerPrincipal;
+    next();
+    return;
   }
 
   if (!API_KEY) {
@@ -45,13 +84,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     return;
   }
 
-  if (!timingSafeEqual(token, API_KEY)) {
-    res.status(401).json({ error: 'Token inválido' });
-    return;
-  }
-
-  (req as any).user = { userId: 'api-key', email: 'automation@collecta.local', role: 'automation' };
-  next();
+  res.status(401).json({ error: 'Token inválido' });
 }
 
 export function requireAdminConfirm(req: Request, res: Response, next: NextFunction) {

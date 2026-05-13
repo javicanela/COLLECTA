@@ -35,6 +35,8 @@ export function CollectionActionBar({
   onToggleExclude,
   onDelete,
 }: CollectionActionBarProps) {
+  const hasPhone = !!operation.client?.telefono;
+
   return (
     <div className="flex items-center justify-end gap-1">
       <ActionButton
@@ -75,6 +77,8 @@ export function CollectionActionBar({
         variant="ghost"
         size="xs"
         iconOnly
+        disabled={!hasPhone}
+        disabledReason={!hasPhone ? 'Falta telefono del cliente' : undefined}
         onClick={() => onSendWA(operation)}
       />
 
@@ -97,6 +101,7 @@ export function CollectionActionBar({
         iconOnly
         loading={sendingStatement}
         disabled={sendingStatement}
+        disabledReason={sendingStatement ? 'Ya se esta enviando el estado de cuenta' : undefined}
         onClick={() => onSendStatement(operation)}
       />
 

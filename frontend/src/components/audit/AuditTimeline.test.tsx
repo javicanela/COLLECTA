@@ -71,6 +71,32 @@ describe('normalizeAuditEvent', () => {
     expect(labels).toContain('fingerprint');
     expect(labels).toContain('fuente');
   });
+
+  it('renders WhatsApp payment correlation JSON as readable audit evidence', () => {
+    const event = normalizeAuditEvent({
+      ...baseLog,
+      tipo: 'PAYMENT_DETECTION',
+      variante: 'WHATSAPP_REPLY',
+      resultado: 'ACCEPTED',
+      mensaje: JSON.stringify({
+        event: 'whatsapp_payment_confirmation_correlation',
+        phoneLast4: '4500',
+        sourceMessageId: 'wa-pay-1',
+        operationId: 'op-123',
+        amount: 2600,
+        reasons: ['amount_exact', 'previous_outbound_whatsapp'],
+        confidence: 0.95,
+        textSample: 'te mande comprobante por $2,600.00',
+      }),
+    });
+
+    expect(event.type).toBe('PAYMENT_DETECTION');
+    expect(event.message).not.toContain('{');
+    expect(event.detailRows).toContainEqual(['Operacion', 'op-123']);
+    expect(event.detailRows).toContainEqual(['Monto detectado', '2600']);
+    expect(event.detailRows).toContainEqual(['Motivos', 'amount_exact, previous_outbound_whatsapp']);
+    expect(event.detailRows).toContainEqual(['Telefono', '******4500']);
+  });
 });
 
 describe('filterAuditEvents', () => {

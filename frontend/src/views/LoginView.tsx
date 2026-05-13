@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { Lock as LockIcon, User as UserIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
+import { getExternalAuthProviderStatus, startSupabaseLogin } from '../services/externalAuthProvider';
+import { LoginProviderPanel } from './LoginProviderPanel';
 
 export default function LoginView() {
   const login = useAuthStore((s) => s.login);
@@ -8,6 +10,7 @@ export default function LoginView() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [providerStatus] = useState(() => getExternalAuthProviderStatus());
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -19,6 +22,14 @@ export default function LoginView() {
     const ok = await login(email, password);
     if (!ok) {
       setError('Credenciales inválidas. Intenta de nuevo.');
+    }
+  };
+
+  const handleProviderLogin = async () => {
+    setError('');
+    const result = await startSupabaseLogin();
+    if (!result.ok) {
+      setError(result.error);
     }
   };
 
@@ -249,6 +260,12 @@ export default function LoginView() {
               >
                 {isLoading ? 'Verificando...' : 'Ingresar'}
               </button>
+
+              <LoginProviderPanel
+                status={providerStatus}
+                isLoading={isLoading}
+                onProviderLogin={handleProviderLogin}
+              />
             </form>
           </div>
 

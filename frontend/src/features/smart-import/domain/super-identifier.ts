@@ -118,6 +118,14 @@ function setCanonicalValue(row: CanonicalImportRow, field: CanonicalField, value
   }
 }
 
+function addContactCompletenessWarnings(row: CanonicalImportRow): void {
+  const hasClientIdentity = Boolean(row.client.rfc || row.client.nombre);
+  if (!hasClientIdentity) return;
+
+  if (!row.client.telefono) row.warnings.push('row:telefono_missing');
+  if (!row.client.email) row.warnings.push('row:email_missing');
+}
+
 export function buildCanonicalRows(sheet: WorkbookSheetSummary, region: DetectedRegion, mappings: MappingCandidate[]): CanonicalImportRow[] {
   const activeMappings = mappings.filter((mapping) => mapping.field !== 'ignore' && mapping.confidence >= 0.38);
   const rows: CanonicalImportRow[] = [];
@@ -135,6 +143,8 @@ export function buildCanonicalRows(sheet: WorkbookSheetSummary, region: Detected
     for (const mapping of activeMappings) {
       setCanonicalValue(canonicalRow, mapping.field, sourceRow[mapping.columnIndex]);
     }
+
+    addContactCompletenessWarnings(canonicalRow);
 
     if (Object.keys(canonicalRow.client).length > 0 || Object.keys(canonicalRow.operation).length > 0) {
       rows.push(canonicalRow);

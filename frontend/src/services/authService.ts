@@ -7,6 +7,7 @@ export interface LoginResponse {
     name: string;
     email: string;
     role: string;
+    authSource?: string;
   };
 }
 
@@ -17,7 +18,19 @@ export interface VerifyResponse {
     name: string;
     email: string;
     role: string;
+    authSource?: string;
   };
+}
+
+export interface ProviderStatusResponse {
+  providers: Array<{
+    id: string;
+    name: string;
+    configured: boolean;
+    available: boolean;
+    reason: string;
+    requiredEnv: string[];
+  }>;
 }
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -47,6 +60,10 @@ export const authService = {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
+  },
+
+  async providers(): Promise<ProviderStatusResponse> {
+    return request<ProviderStatusResponse>('/auth/providers');
   },
 
   logout(): void {

@@ -34,7 +34,17 @@ README.md   Entrada del proyecto
 
 ## Desarrollo local
 
-Backend:
+Ruta recomendada:
+
+```powershell
+.\scripts\collecta-doctor.ps1
+.\scripts\collecta-dev.ps1
+```
+
+Consulta `docs/runbooks/ENVIRONMENT_SETUP.md` para instalacion completa, DB de
+test, puertos, logs y solucion de problemas.
+
+Backend manual:
 
 ```bash
 cd backend
@@ -54,6 +64,25 @@ npm run dev
 ```
 
 No subas `.env`, secretos ni credenciales al repositorio.
+
+## Pruebas
+
+Ruta completa:
+
+```powershell
+.\scripts\collecta-test.ps1
+```
+
+Comandos manuales:
+
+```powershell
+cd frontend
+npm run build
+npm test
+cd ..\backend
+npm run build
+npm run test:full
+```
 
 ## Variables importantes
 
@@ -79,6 +108,8 @@ proveedor externo en requisito.
 - `AGENTS.md`: reglas operativas para Codex.
 - `CLAUDE.md`: puente para Claude Code hacia `AGENTS.md`.
 - `docs/PLAN_DEFINITIVO_COLLECTA.md`: plan maestro.
+- `docs/README.md`: indice de documentacion.
+- `docs/runbooks/README.md`: instalacion, QA, secretos, plataformas y handoff.
 - `docs/specs/`: especificaciones vigentes.
 - `docs/specs/smart-import-super-identifier.md`: especificacion del importador avanzado.
 - `n8n/README.md`: configuracion de workflows y autenticacion.

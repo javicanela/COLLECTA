@@ -76,7 +76,7 @@ function AppRoutes() {
 }
 
 function App() {
-  const { isAuthenticated, checkAuth } = useAuthStore();
+  const { isAuthenticated, isLoading, checkAuth } = useAuthStore();
 
   useEffect(() => {
     checkAuth();
@@ -85,9 +85,20 @@ function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
-        {isAuthenticated ? <AppRoutes /> : <LoginView />}
+        {isLoading ? <SessionRestoreView /> : isAuthenticated ? <AppRoutes /> : <LoginView />}
       </BrowserRouter>
     </ErrorBoundary>
+  );
+}
+
+function SessionRestoreView() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#090718] text-white">
+      <div className="text-center">
+        <div className="mx-auto mb-4 h-9 w-9 animate-spin rounded-full border-2 border-white/20 border-t-purple-300" />
+        <p className="text-sm font-semibold tracking-wide text-white/70">Restaurando sesion segura...</p>
+      </div>
+    </div>
   );
 }
 

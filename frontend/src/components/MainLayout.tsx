@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { api } from '../services/api';
-import { Sun, Moon, Menu, X, Wallet } from 'lucide-react';
+import { Sun, Moon, Menu, X, Wallet, LogOut } from 'lucide-react';
 import { useOperationStore } from '../stores/useOperationStore';
 import { useTheme } from '../hooks/useTheme';
 import { useToast } from '../hooks/useToast';
@@ -17,6 +17,7 @@ import {
 import { PageHeader } from './layout/PageHeader';
 import { StatusRail, type RailServiceStatus, type WhatsAppConnectionStatus } from './layout/StatusRail';
 import type { DiagnosticsReadinessCheck, DiagnosticsReadinessResponse } from '../types';
+import { useAuthStore } from '../stores/useAuthStore';
 
 /* ── MainLayout ─────────────────────────────────────────────────────────── */
 
@@ -85,9 +86,18 @@ function SidebarNav({ currentPath, isMobile, vencidasCount, onNavigate }: Sideba
 interface SidebarFooterProps {
   theme: string;
   onToggleTheme: () => void;
+  onLogout: () => void;
+  userName?: string;
+  userRole?: string;
 }
 
-function SidebarFooter({ theme, onToggleTheme }: SidebarFooterProps) {
+export function SidebarFooter({
+  theme,
+  onToggleTheme,
+  onLogout,
+  userName = 'Admin',
+  userRole = 'Administrador',
+}: SidebarFooterProps) {
   return (
     <div className="mt-auto border-t border-[var(--sidebar-border)] px-3 py-3">
       <div className="flex items-center gap-2.5 px-2">
@@ -98,8 +108,8 @@ function SidebarFooter({ theme, onToggleTheme }: SidebarFooterProps) {
           C
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-[var(--sidebar-text-active)]">Admin</p>
-          <p className="truncate text-[10px] text-[var(--sidebar-text)] opacity-50">Administrador</p>
+          <p className="truncate text-sm font-semibold text-[var(--sidebar-text-active)]">{userName}</p>
+          <p className="truncate text-[10px] text-[var(--sidebar-text)] opacity-50">{userRole}</p>
         </div>
         <button
           onClick={onToggleTheme}
@@ -108,6 +118,14 @@ function SidebarFooter({ theme, onToggleTheme }: SidebarFooterProps) {
           aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
         >
           {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
+        <button
+          onClick={onLogout}
+          className="flex-shrink-0 rounded-md p-2 text-[var(--sidebar-text)] transition-colors hover:bg-[var(--sidebar-hover-bg)] hover:text-[var(--sidebar-text-active)]"
+          title="Cerrar sesion"
+          aria-label="Cerrar sesion"
+        >
+          <LogOut size={16} />
         </button>
       </div>
     </div>
@@ -137,6 +155,7 @@ function getCheckStatus(checks: DiagnosticsReadinessResponse['checks'], id: stri
 export default function MainLayout() {
   const location = useLocation();
   const { fetchOperations, vencidasCount } = useOperationStore();
+  const { user, logout } = useAuthStore();
   const { theme, toggleTheme } = useTheme();
   const { toasts } = useToast();
 
@@ -308,7 +327,13 @@ export default function MainLayout() {
           vencidasCount={vencidasCount}
           onNavigate={() => setSidebarOpen(false)}
         />
-        <SidebarFooter theme={theme} onToggleTheme={toggleTheme} />
+        <SidebarFooter
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          onLogout={logout}
+          userName={user?.name || user?.email || 'Admin'}
+          userRole={user?.role || 'Administrador'}
+        />
       </aside>
 
       {/* ── Main content area ──────────────────────────────────────────── */}

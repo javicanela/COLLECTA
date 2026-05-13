@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import * as jwt from 'jsonwebtoken';
 import { req, TEST_AUTH } from './test-app';
 
 describe('Auth middleware', () => {
@@ -27,6 +28,61 @@ describe('Auth middleware', () => {
       .get('/api/clients')
       .set(TEST_AUTH.headers);
     expect(res.status).toBe(200);
+  });
+
+  it('logs in with local admin credentials and returns a local principal', async () => {
+    const res = await req
+      .post('/api/auth/login')
+      .send({ email: process.env.ADMIN_USER, password: process.env.ADMIN_PASS });
+
+    expect(res.status).toBe(200);
+    expect(res.body.token).toEqual(expect.any(String));
+    expect(res.body.user).toMatchObject({
+      role: 'admin',
+      authSource: 'local',
+    });
+  });
+
+  it('reports provider readiness without exposing configuration values', async () => {
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_JWT_SECRET;
+    delete process.env.SUPABASE_JWKS_URL;
+
+    const res = await req.get('/api/auth/providers');
+
+    expect(res.status).toBe(200);
+    expect(res.body.providers).toContainEqual(expect.objectContaining({
+      id: 'supabase',
+      configured: false,
+      available: false,
+    }));
+    expect(JSON.stringify(res.body)).not.toContain('SUPABASE_JWT_SECRET=');
+    expect(JSON.stringify(res.body)).not.toContain('SUPABASE_ANON_KEY=');
+  });
+
+  it('verifies provider JWTs without treating provider metadata as admin grants', async () => {
+    process.env.SUPABASE_JWT_SECRET = 'supabase_test_secret_12345678901234567890';
+    const token = jwt.sign(
+      {
+        sub: 'supabase-user-001',
+        email: 'asesor@despacho.mx',
+        app_metadata: { collecta_role: 'admin' },
+      },
+      process.env.SUPABASE_JWT_SECRET,
+      { expiresIn: '1h' },
+    );
+
+    const res = await req
+      .post('/api/auth/verify')
+      .set({ Authorization: `Bearer ${token}` });
+
+    expect(res.status).toBe(200);
+    expect(res.body.user).toMatchObject({
+      id: 'supabase-user-001',
+      email: 'asesor@despacho.mx',
+      role: 'asesor',
+      authSource: 'supabase',
+    });
   });
 
   it('protects all client endpoints', async () => {

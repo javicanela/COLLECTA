@@ -1,32 +1,55 @@
 import { Router, Request, Response } from 'express';
 import * as jwt from 'jsonwebtoken';
+import { getAuthProviderStatus, verifyProviderToken } from '../services/authProvider';
+import { AuthenticatedPrincipal, normalizePrincipalRole } from '../services/authTypes';
 
 const router = Router();
 
-const JWT_SECRET = process.env.JWT_SECRET;
-const ADMIN_USER = process.env.ADMIN_USER;
-const ADMIN_PASS = process.env.ADMIN_PASS;
 const TOKEN_EXPIRY = '24h';
 
-if (!JWT_SECRET || JWT_SECRET.length < 32) {
-  console.warn('[AUTH] WARNING: JWT_SECRET is not set or too short (min 32 chars)');
+function jwtSecret(): string | undefined {
+  return process.env.JWT_SECRET;
 }
-if (!ADMIN_USER || !ADMIN_PASS) {
-  console.warn('[AUTH] WARNING: ADMIN_USER or ADMIN_PASS is not set');
+
+function adminUser(): string | undefined {
+  return process.env.ADMIN_USER;
+}
+
+function adminPass(): string | undefined {
+  return process.env.ADMIN_PASS;
 }
 
 function isValidSecret(): boolean {
-  return !!(JWT_SECRET && JWT_SECRET.length >= 32);
+  const secret = jwtSecret();
+  return !!(secret && secret.length >= 32);
 }
 
 function isValidAdminCredentials(email: string, password: string): boolean {
-  if (!ADMIN_USER || !ADMIN_PASS) {
+  const configuredUser = adminUser();
+  const configuredPass = adminPass();
+  if (!configuredUser || !configuredPass) {
     return false;
   }
-  const emailMatch = email.toLowerCase() === ADMIN_USER.toLowerCase() ||
-                     email.toLowerCase() === `${ADMIN_USER}@collecta.local`.toLowerCase();
-  return emailMatch && password === ADMIN_PASS;
+  const normalizedEmail = email.toLowerCase();
+  const emailMatch =
+    normalizedEmail === configuredUser.toLowerCase() ||
+    normalizedEmail === `${configuredUser}@collecta.local`.toLowerCase();
+  return emailMatch && password === configuredPass;
 }
+
+function publicUser(principal: AuthenticatedPrincipal) {
+  return {
+    id: principal.userId,
+    name: principal.role === 'admin' ? 'Administrador' : principal.email || 'Usuario Collecta',
+    email: principal.email,
+    role: principal.role,
+    authSource: principal.authSource,
+  };
+}
+
+router.get('/providers', (_req: Request, res: Response) => {
+  res.json({ providers: getAuthProviderStatus() });
+});
 
 router.post('/login', (req: Request, res: Response) => {
   const { email, password } = req.body;
@@ -46,30 +69,26 @@ router.post('/login', (req: Request, res: Response) => {
     return;
   }
 
-  const payload = {
+  const principal: AuthenticatedPrincipal = {
     userId: 'admin-001',
-    email: ADMIN_USER,
+    email: adminUser(),
     role: 'admin',
+    authSource: 'local',
   };
 
   try {
-    const token = jwt.sign(payload, JWT_SECRET as string, { expiresIn: TOKEN_EXPIRY });
+    const token = jwt.sign(principal, jwtSecret() as string, { expiresIn: TOKEN_EXPIRY });
 
     res.json({
       token,
-      user: {
-        id: payload.userId,
-        name: 'Administrador',
-        email: payload.email,
-        role: payload.role,
-      },
+      user: publicUser(principal),
     });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: 'Error generando token' });
   }
 });
 
-router.post('/verify', (req: Request, res: Response) => {
+router.post('/verify', async (req: Request, res: Response) => {
   const authHeader = req.headers['authorization'];
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -85,22 +104,34 @@ router.post('/verify', (req: Request, res: Response) => {
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET as string) as {
+    const decoded = jwt.verify(token, jwtSecret() as string) as {
       userId: string;
-      email: string;
-      role: string;
+      email?: string;
+      role?: string;
+      authSource?: string;
+    };
+
+    const principal: AuthenticatedPrincipal = {
+      userId: decoded.userId,
+      email: decoded.email,
+      role: normalizePrincipalRole(decoded.role, 'viewer'),
+      authSource: decoded.authSource === 'local' ? 'local' : 'local',
     };
 
     res.json({
       valid: true,
-      user: {
-        id: decoded.userId,
-        name: 'Administrador',
-        email: decoded.email,
-        role: decoded.role,
-      },
+      user: publicUser(principal),
     });
-  } catch (err) {
+  } catch {
+    const providerPrincipal = await verifyProviderToken(token);
+    if (providerPrincipal) {
+      res.json({
+        valid: true,
+        user: publicUser(providerPrincipal),
+      });
+      return;
+    }
+
     res.status(401).json({ error: 'Token inválido o expirado' });
   }
 });

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { normalizePhone } from '../services/evolutionApi';
+import { correlateIncomingWhatsAppPaymentConfirmation } from '../services/paymentDetection';
 import axios from 'axios';
 
 const router = Router();
@@ -103,6 +104,14 @@ router.post('/evolution', verifyWebhookSecret, async (req: Request, res: Respons
       },
     });
 
+    const paymentCorrelation = content
+      ? await correlateIncomingWhatsAppPaymentConfirmation(prisma, {
+        phone: normalizedPhone,
+        text: content,
+        sourceMessageId: message.key?.id || null,
+      })
+      : null;
+
     // Forward receipt-like messages to the provider-agnostic payment flow.
     if (PAYMENT_DETECTION_WEBHOOK_URL && (mediaUrl || content)) {
       try {
@@ -132,6 +141,14 @@ router.post('/evolution', verifyWebhookSecret, async (req: Request, res: Respons
       processed: true,
       messageType,
       clientMatched: !!client,
+      paymentCorrelation: paymentCorrelation
+        ? {
+          status: paymentCorrelation.status,
+          operationId: paymentCorrelation.operationId || null,
+          reasons: paymentCorrelation.reasons,
+          confidence: paymentCorrelation.confidence,
+        }
+        : null,
     });
   } catch (error: any) {
     res.status(500).json({ error: 'Error processing webhook', details: error.message });
