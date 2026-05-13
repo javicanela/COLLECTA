@@ -27,6 +27,21 @@ type DetectionResult = {
 export type PaymentDetectionResult = DetectionResult;
 
 const AMOUNT_TOLERANCE = 0.5;
+const ACCEPTED_PAYMENT_PHRASES = [
+  'ya pague',
+  'pagado',
+  'transferido',
+  'te mande comprobante',
+  'envie comprobante',
+  'liquidado',
+];
+const REJECTED_PAYMENT_PHRASES = [
+  'pago manana',
+  'luego pago',
+  'no puedo pagar',
+  'cuanto debo',
+  'manda factura',
+];
 
 function paymentDateFromEvidence(paymentDate?: string): Date {
   if (!paymentDate) return new Date();
@@ -35,6 +50,40 @@ function paymentDateFromEvidence(paymentDate?: string): Date {
 
 function fingerprint(evidence: PaymentEvidence): string {
   return evidence.receiptId || evidence.reference || `${evidence.rfc}:${evidence.amount}:${evidence.paymentDate || ''}`;
+}
+
+function normalizeDigits(value: string): string {
+  return value.replace(/\D/g, '');
+}
+
+function last10Digits(value: string): string {
+  return normalizeDigits(value).slice(-10);
+}
+
+function normalizeMessageText(value?: string | null): string {
+  return (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function hasPaymentConfirmationLanguage(text: string): boolean {
+  return ACCEPTED_PAYMENT_PHRASES.some(phrase => text.includes(phrase));
+}
+
+function hasRejectedPaymentLanguage(text: string): boolean {
+  return REJECTED_PAYMENT_PHRASES.some(phrase => text.includes(phrase));
+}
+
+function parseAmountFromText(rawText: string): number | null {
+  const matches = rawText.match(/(?:\$|\bmxn\b|\bm\.n\.\b)?\s*(\d{1,3}(?:,\d{3})+|\d+)(\.\d{1,2})?/gi) || [];
+  const amounts = matches
+    .map(match => Number(match.replace(/\b(mxn|m\.n\.)\b/gi, '').replace(/[$,\s]/g, '')))
+    .filter(amount => Number.isFinite(amount) && amount > 0);
+
+  return amounts.length > 0 ? amounts[0] : null;
 }
 
 async function writeDetectionLog(
@@ -59,6 +108,45 @@ async function writeDetectionLog(
       variante: evidence.source || 'manual',
       resultado,
       mensaje: parts.join(' | '),
+      modo: 'PRODUCCION',
+    },
+  });
+}
+
+async function writeIncomingCorrelationLog(
+  prisma: PrismaClient,
+  params: {
+    clientId?: string | null;
+    phone: string;
+    resultado: DetectionStatus;
+    reasons: string[];
+    confidence: number;
+    operationId?: string | null;
+    amount?: number | null;
+    sourceMessageId?: string | null;
+    rawText?: string | null;
+  },
+) {
+  const payload = {
+    event: 'whatsapp_payment_confirmation_correlation',
+    phoneLast4: last10Digits(params.phone).slice(-4),
+    sourceMessageId: params.sourceMessageId || null,
+    operationId: params.operationId || null,
+    amount: params.amount ?? null,
+    reasons: params.reasons,
+    confidence: params.confidence,
+    incomingMessageId: params.sourceMessageId || null,
+    textSample: params.rawText ? params.rawText.substring(0, 120) : null,
+  };
+
+  await prisma.logEntry.create({
+    data: {
+      clientId: params.clientId || null,
+      tipo: PAYMENT_DETECTION_LOG_TYPE,
+      variante: 'WHATSAPP_REPLY',
+      resultado: params.resultado,
+      mensaje: JSON.stringify(payload),
+      telefono: params.phone,
       modo: 'PRODUCCION',
     },
   });
@@ -166,5 +254,182 @@ export async function detectPaymentFromEvidence(
     operationId: updated.id,
     reasons,
     confidence: reasons.includes('amount_exact') ? 0.95 : 0.85,
+  };
+}
+
+export async function correlateIncomingWhatsAppPaymentConfirmation(
+  prisma: PrismaClient,
+  input: {
+    phone: string;
+    text?: string | null;
+    sourceMessageId?: string | null;
+  },
+): Promise<DetectionResult> {
+  const normalizedText = normalizeMessageText(input.text);
+  const phoneLast10 = last10Digits(input.phone);
+  const amount = parseAmountFromText(input.text || '');
+  const duplicateNeedle = input.sourceMessageId
+    ? `"incomingMessageId":"${input.sourceMessageId}"`
+    : `"incomingFingerprint":"${phoneLast10}:${normalizedText}:${amount ?? ''}"`;
+
+  const previousAccepted = await prisma.logEntry.findFirst({
+    where: {
+      tipo: PAYMENT_DETECTION_LOG_TYPE,
+      resultado: 'ACCEPTED',
+      mensaje: { contains: duplicateNeedle },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (previousAccepted) {
+    const previousOperationId = previousAccepted.mensaje?.match(/"operationId":"([^"]+)"/)?.[1];
+    const reasons = ['duplicate_incoming_message'];
+    await writeIncomingCorrelationLog(prisma, {
+      clientId: previousAccepted.clientId,
+      phone: input.phone,
+      resultado: 'DUPLICATE',
+      reasons,
+      confidence: 1,
+      operationId: previousOperationId,
+      amount,
+      sourceMessageId: input.sourceMessageId,
+      rawText: input.text,
+    });
+    return {
+      status: 'DUPLICATE',
+      operationId: previousOperationId,
+      reasons,
+      confidence: 1,
+    };
+  }
+
+  const client = phoneLast10
+    ? await prisma.client.findFirst({
+      where: {
+        telefono: { contains: phoneLast10 },
+      },
+    })
+    : null;
+
+  if (!client) {
+    const reasons = ['client_not_found'];
+    await writeIncomingCorrelationLog(prisma, {
+      phone: input.phone,
+      resultado: 'REVIEW_REQUIRED',
+      reasons,
+      confidence: 0,
+      amount,
+      sourceMessageId: input.sourceMessageId,
+      rawText: input.text,
+    });
+    return { status: 'REVIEW_REQUIRED', reasons, confidence: 0 };
+  }
+
+  const baseLog = {
+    clientId: client.id,
+    phone: input.phone,
+    amount,
+    sourceMessageId: input.sourceMessageId,
+    rawText: input.text,
+  };
+
+  if (hasRejectedPaymentLanguage(normalizedText) || !hasPaymentConfirmationLanguage(normalizedText)) {
+    const reasons = ['non_payment_language'];
+    await writeIncomingCorrelationLog(prisma, {
+      ...baseLog,
+      resultado: 'REVIEW_REQUIRED',
+      reasons,
+      confidence: 0.15,
+    });
+    return { status: 'REVIEW_REQUIRED', reasons, confidence: 0.15 };
+  }
+
+  const previousOutbound = await prisma.whatsAppMessage.findFirst({
+    where: {
+      clientId: client.id,
+      direction: 'OUTGOING',
+      phone: { contains: phoneLast10 },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (!previousOutbound) {
+    const reasons = ['no_previous_outbound_whatsapp'];
+    await writeIncomingCorrelationLog(prisma, {
+      ...baseLog,
+      resultado: 'REVIEW_REQUIRED',
+      reasons,
+      confidence: 0.2,
+    });
+    return { status: 'REVIEW_REQUIRED', reasons, confidence: 0.2 };
+  }
+
+  const openOperations = await prisma.operation.findMany({
+    where: {
+      clientId: client.id,
+      fechaPago: null,
+      estatus: { not: 'PAGADO' },
+      excluir: false,
+      archived: false,
+    },
+    orderBy: { fechaVence: 'asc' },
+  });
+
+  let selectedOperation = null as typeof openOperations[number] | null;
+  let reasons = ['previous_outbound_whatsapp'];
+  if (amount != null) {
+    const amountMatches = openOperations.filter(op => Math.abs(op.monto - amount) <= AMOUNT_TOLERANCE);
+    if (amountMatches.length !== 1) {
+      reasons = ['no_safe_operation_match', 'previous_outbound_whatsapp'];
+      await writeIncomingCorrelationLog(prisma, {
+        ...baseLog,
+        resultado: 'REVIEW_REQUIRED',
+        reasons,
+        confidence: 0.35,
+      });
+      return { status: 'REVIEW_REQUIRED', reasons, confidence: 0.35 };
+    }
+
+    selectedOperation = amountMatches[0];
+    reasons = [
+      Math.abs(selectedOperation.monto - amount) === 0 ? 'amount_exact' : 'amount_within_tolerance',
+      ...reasons,
+    ];
+  } else if (openOperations.length === 1) {
+    selectedOperation = openOperations[0];
+    reasons = ['single_open_operation', ...reasons];
+  } else {
+    reasons = ['multiple_open_operations_without_amount', 'previous_outbound_whatsapp'];
+    await writeIncomingCorrelationLog(prisma, {
+      ...baseLog,
+      resultado: 'REVIEW_REQUIRED',
+      reasons,
+      confidence: 0.4,
+    });
+    return { status: 'REVIEW_REQUIRED', reasons, confidence: 0.4 };
+  }
+
+  const updated = await prisma.operation.update({
+    where: { id: selectedOperation.id },
+    data: {
+      estatus: 'PAGADO',
+      fechaPago: new Date(),
+    },
+  });
+
+  const confidence = amount != null ? 0.95 : 0.86;
+  await writeIncomingCorrelationLog(prisma, {
+    ...baseLog,
+    resultado: 'ACCEPTED',
+    reasons,
+    confidence,
+    operationId: updated.id,
+  });
+
+  return {
+    status: 'ACCEPTED',
+    operationId: updated.id,
+    reasons,
+    confidence,
   };
 }
