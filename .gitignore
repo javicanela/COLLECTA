@@ -43,6 +43,8 @@ backend/tmp/
 # Test artifacts
 test-screenshots/
 coverage/
+frontend/test-results/
+frontend/playwright-report/
 
 # Playwright MCP artifacts (session logs + snapshots)
 .playwright-mcp/

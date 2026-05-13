@@ -10,8 +10,13 @@ const WEBHOOK_SECRET = process.env.EVOLUTION_WEBHOOK_SECRET || '';
 const PAYMENT_DETECTION_WEBHOOK_URL = process.env.PAYMENT_DETECTION_WEBHOOK_URL || '';
 const PAYMENT_DETECTION_WEBHOOK_TOKEN = process.env.PAYMENT_DETECTION_WEBHOOK_TOKEN || '';
 
+let warnedEmptySecret = false;
 function verifyWebhookSecret(req: Request, res: Response, next: import('express').NextFunction) {
   if (!WEBHOOK_SECRET) {
+    if (!warnedEmptySecret && process.env.NODE_ENV === 'production') {
+      warnedEmptySecret = true;
+      console.warn('[webhooks] WARNING: WEBHOOK_SECRET vacio en produccion');
+    }
     next();
     return;
   }
@@ -50,6 +55,18 @@ router.post('/evolution', verifyWebhookSecret, async (req: Request, res: Respons
       return;
     }
 
+    const evolutionId = message.key?.id || null;
+    if (evolutionId) {
+      const existing = await prisma.whatsAppMessage.findFirst({
+        where: { evolutionMsgId: evolutionId, direction: 'INCOMING' },
+        select: { id: true },
+      });
+      if (existing) {
+        res.json({ received: true, processed: false, reason: 'duplicate_message' });
+        return;
+      }
+    }
+
     // Determine message type and content
     let messageType = 'TEXT';
     let content: string | null = null;
@@ -77,8 +94,7 @@ router.post('/evolution', verifyWebhookSecret, async (req: Request, res: Respons
       },
     });
 
-    // Store the incoming message
-    await prisma.whatsAppMessage.create({
+    const incomingMessageRow = await prisma.whatsAppMessage.create({
       data: {
         clientId: client?.id || null,
         direction: 'INCOMING',
@@ -111,6 +127,21 @@ router.post('/evolution', verifyWebhookSecret, async (req: Request, res: Respons
         sourceMessageId: message.key?.id || null,
       })
       : null;
+
+    if (incomingMessageRow && paymentCorrelation) {
+      const statusMap: Record<string, string> = {
+        ACCEPTED: 'PAYMENT_MATCHED',
+        DUPLICATE: 'DUPLICATE',
+        REVIEW_REQUIRED: 'REVIEW_REQUIRED',
+      };
+      const newStatus = statusMap[paymentCorrelation.status];
+      if (newStatus) {
+        await prisma.whatsAppMessage.update({
+          where: { id: incomingMessageRow.id },
+          data: { status: newStatus },
+        });
+      }
+    }
 
     // Forward receipt-like messages to the provider-agnostic payment flow.
     if (PAYMENT_DETECTION_WEBHOOK_URL && (mediaUrl || content)) {

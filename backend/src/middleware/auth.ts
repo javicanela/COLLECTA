@@ -2,12 +2,15 @@ import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import * as jwt from 'jsonwebtoken';
 import { verifyProviderToken } from '../services/authProvider';
+import { isRevoked } from '../services/tokenRevocation';
 import {
   AuthenticatedPrincipal,
   normalizePrincipalRole,
 } from '../services/authTypes';
 
 export type { AuthenticatedPrincipal } from '../services/authTypes';
+
+const MIN_JWT_SECRET_LENGTH = 32;
 
 function timingSafeEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
@@ -29,6 +32,13 @@ function localPrincipalFromJwt(decoded: { userId?: string; email?: string; role?
   };
 }
 
+interface DecodedLocalJwt {
+  userId?: string;
+  email?: string;
+  role?: string;
+  jti?: string;
+}
+
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const API_KEY = process.env.API_KEY;
   const JWT_SECRET = process.env.JWT_SECRET;
@@ -43,16 +53,28 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   const token = authHeader.slice(7);
 
-  if (JWT_SECRET && JWT_SECRET.length >= 32) {
+  if (JWT_SECRET) {
+    if (JWT_SECRET.length < MIN_JWT_SECRET_LENGTH) {
+      // Bug 9: fail loud instead of silently falling back to API_KEY.
+      // Never echo the secret value back in the response.
+      res.status(500).json({
+        error: `JWT_SECRET configurado pero invalido (min ${MIN_JWT_SECRET_LENGTH} chars)`,
+      });
+      return;
+    }
+
     try {
-      const decoded = jwt.verify(token, JWT_SECRET) as {
-        userId: string;
-        email?: string;
-        role?: string;
-      };
+      const decoded = jwt.verify(token, JWT_SECRET) as DecodedLocalJwt;
+
+      // Bug 10: respect token revocation blocklist for issued JWTs.
+      if (decoded.jti && isRevoked(decoded.jti)) {
+        res.status(401).json({ error: 'Token revocado' });
+        return;
+      }
+
       const principal = localPrincipalFromJwt(decoded);
       if (principal) {
-        (req as any).user = principal;
+        req.user = principal;
         next();
         return;
       }
@@ -62,7 +84,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 
   if (API_KEY && timingSafeEqual(token, API_KEY)) {
-    (req as any).user = {
+    req.user = {
       userId: 'api-key',
       email: 'automation@collecta.local',
       role: 'service',
@@ -74,7 +96,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   const providerPrincipal = await verifyProviderToken(token);
   if (providerPrincipal) {
-    (req as any).user = providerPrincipal;
+    req.user = providerPrincipal;
     next();
     return;
   }
@@ -88,6 +110,14 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 }
 
 export function requireAdminConfirm(req: Request, res: Response, next: NextFunction) {
+  // Bug 11: gate role first so a non-admin principal with the right header
+  // cannot perform destructive operations.
+  const principal = req.user;
+  if (!principal || principal.role !== 'admin') {
+    res.status(403).json({ error: 'Se requiere rol admin para esta operación' });
+    return;
+  }
+
   const confirmHeader = req.headers['x-admin-confirm'];
   if (confirmHeader !== 'yes-delete-all') {
     res.status(403).json({ error: 'Se requiere X-Admin-Confirm: yes-delete-all para esta operación' });

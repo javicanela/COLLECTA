@@ -21,6 +21,8 @@ export interface SmartImportProviderConfig {
   byok?: {
     enabled: boolean;
     provider: string;
+    apiKey?: string;
+    model?: string;
   };
 }
 

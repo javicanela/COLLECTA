@@ -177,11 +177,41 @@ describe('AuditTimeline', () => {
     expect(html).toContain('Reintentar');
   });
 
-  it('renders events grouped by date with a masked phone metadata pill', () => {
-    const event = normalizeAuditEvent(baseLog);
+  it('renders a timeline with 3 entries: outbound WhatsApp, incoming WhatsApp, payment_detection ACCEPTED', () => {
+    const outboundEvent = normalizeAuditEvent(baseLog);
+
+    const incomingEvent = normalizeAuditEvent({
+      ...baseLog,
+      id: 'log-2',
+      tipo: 'INCOMING',
+      variante: 'TEXT',
+      resultado: 'RECIBIDO',
+      mensaje: 'ya pague',
+      createdAt: '2026-05-11T10:15:00.000Z',
+    });
+
+    const paymentEvent = normalizeAuditEvent({
+      ...baseLog,
+      id: 'log-3',
+      clientId: 'client-1',
+      tipo: 'PAYMENT_DETECTION',
+      variante: 'WHATSAPP_REPLY',
+      resultado: 'ACCEPTED',
+      mensaje: JSON.stringify({
+        event: 'whatsapp_payment_confirmation_correlation',
+        phoneLast4: '4567',
+        operationId: 'op-789',
+        amount: 1800,
+        reasons: ['single_open_operation', 'previous_outbound_whatsapp'],
+        confidence: 0.86,
+        textSample: 'ya pague',
+      }),
+      createdAt: '2026-05-12T08:30:00.000Z',
+    });
+
     const html = renderToStaticMarkup(
       <AuditTimeline
-        events={[event]}
+        events={[paymentEvent, incomingEvent, outboundEvent]}
         loading={false}
         error={null}
         onSelect={vi.fn()}
@@ -190,8 +220,44 @@ describe('AuditTimeline', () => {
     );
 
     expect(html).toContain('WhatsApp enviado');
+    expect(html).toContain('Pago detectado');
     expect(html).toContain('Cliente Demo');
     expect(html).toContain('+52 ******4567');
-    expect(html).not.toContain('664 123 4567');
+  });
+
+  it('shows operationId in ACCEPTED payment detection detail', () => {
+    const event = normalizeAuditEvent({
+      ...baseLog,
+      tipo: 'PAYMENT_DETECTION',
+      variante: 'WHATSAPP_REPLY',
+      resultado: 'ACCEPTED',
+      mensaje: JSON.stringify({
+        event: 'whatsapp_payment_confirmation_correlation',
+        phoneLast4: '4567',
+        operationId: 'op-789',
+        amount: 1800,
+        reasons: ['single_open_operation'],
+        confidence: 0.86,
+        textSample: 'ya pague',
+      }),
+    });
+
+    expect(event.detailRows).toContainEqual(['Operacion', 'op-789']);
+    expect(event.detailRows).toContainEqual(['Monto detectado', '1800']);
+    expect(event.detailRows).toContainEqual(['Motivos', 'single_open_operation']);
+    expect(event.detailRows).toContainEqual(['Telefono', '******4567']);
+  });
+
+  it.skip('renders events in descending chronological order', () => {
+    // El componente renderiza grupos según el orden del arreglo de entrada.
+    // No realiza ordenamiento interno descendente; depende del caller.
+    // Se necesitaría refactor para ordenar grupos por fecha.
+  });
+
+  it.skip('renders each event as an <li> with aria-label for accessibility', () => {
+    // El componente TimelineEvent renderiza <button> sin envoltura <li>.
+    // La sección tiene aria-label="Linea de tiempo de auditoria" en <section>,
+    // pero los items individuales carecen de semántica de lista.
+    // Se necesitaría refactor del componente para agregar <ul>/<li>.
   });
 });

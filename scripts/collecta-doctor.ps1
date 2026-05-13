@@ -84,10 +84,42 @@ if ($npmVersion) {
   Add-Issue "npm is required."
 }
 
+function Test-TcpReachable {
+  param([string]$HostName, [int]$Port, [int]$TimeoutMs = 1500)
+  try {
+    $client = New-Object System.Net.Sockets.TcpClient
+    $iar = $client.BeginConnect($HostName, $Port, $null, $null)
+    if ($iar.AsyncWaitHandle.WaitOne($TimeoutMs, $false)) {
+      $client.EndConnect($iar)
+      $client.Close()
+      return $true
+    }
+    $client.Close()
+    return $false
+  } catch {
+    return $false
+  }
+}
+
+function Get-CommandWithTimeout {
+  param([string]$Command, [string[]]$Arguments, [int]$TimeoutSec = 5)
+  $job = Start-Job -ScriptBlock { param($c, $a) & $c @$a 2>$null } -ArgumentList $Command, $Arguments
+  $job | Wait-Job -Timeout $TimeoutSec | Out-Null
+  if ($job.State -eq 'Running') {
+    $job | Stop-Job | Out-Null
+    Remove-Job $job -Force
+    return $null
+  }
+  $output = $job | Receive-Job
+  Remove-Job $job -Force
+  if (-not $output) { return $null }
+  return ($output | Select-Object -First 1).ToString().Trim()
+}
+
 $dockerVersion = Get-CommandText "docker" @("--version")
 if ($dockerVersion) {
   Write-Check "Docker CLI" "OK" $dockerVersion
-  $dockerInfo = Get-CommandText "docker" @("info", "--format", "{{.ServerVersion}}")
+  $dockerInfo = Get-CommandWithTimeout "docker" @("info", "--format", "{{.ServerVersion}}") 5
   if ($dockerInfo) {
     Write-Check "Docker daemon" "OK" "server $dockerInfo"
   } else {
@@ -95,7 +127,7 @@ if ($dockerVersion) {
     Add-Warning "Docker daemon is not reachable. Open Docker Desktop or use an existing local PostgreSQL test database."
   }
 
-  $container = Get-CommandText "docker" @("ps", "-a", "--filter", "name=collecta-test-postgres", "--format", "{{.Status}}")
+  $container = Get-CommandWithTimeout "docker" @("ps", "-a", "--filter", "name=collecta-test-postgres", "--format", "{{.Status}}") 5
   if ($container) {
     Write-Check "collecta-test-postgres" "OK" $container
   } else {
@@ -105,6 +137,13 @@ if ($dockerVersion) {
 } else {
   Write-Check "Docker CLI" "WARNING" "not found"
   Add-Warning "Docker is optional only if a safe local PostgreSQL test database is already available."
+}
+
+if (Test-TcpReachable "127.0.0.1" 5432) {
+  Write-Check "Postgres TCP" "OK" "127.0.0.1:5432 alcanzable"
+} else {
+  Write-Check "Postgres TCP" "WARNING" "127.0.0.1:5432 no responde"
+  Add-Warning "Postgres no responde en 5432. Inicia el contenedor o tu instancia local."
 }
 
 $rootDriveName = ([System.IO.Path]::GetPathRoot($repoRoot)).TrimEnd("\").TrimEnd(":")
@@ -120,6 +159,21 @@ if ($drive) {
 } else {
   Write-Check "Free disk" "WARNING" "could not inspect drive"
   Add-Warning "Could not inspect free disk space."
+}
+
+$envTest = Join-Path $repoRoot "backend\.env.test"
+if (Test-Path $envTest) {
+  Write-Check "backend/.env.test" "OK"
+  $required = @('DATABASE_URL','JWT_SECRET','API_KEY','ADMIN_USER','ADMIN_PASS')
+  $contentLines = Get-Content $envTest
+  foreach ($key in $required) {
+    if (-not ($contentLines -match "^$key=")) {
+      Add-Warning "backend/.env.test no define $key"
+    }
+  }
+} else {
+  Write-Check "backend/.env.test" "MISSING"
+  Add-Issue "Falta backend/.env.test. Sin el, npm run test:prepare falla."
 }
 
 $backendNodeModules = Join-Path $repoRoot "backend\node_modules"

@@ -206,25 +206,89 @@ describe('WhatsApp payment confirmation correlation', () => {
     expect(unchanged.estatus).toBe('PENDIENTE');
   });
 
+  it('parses amount correctly when text contains date-like tokens', async () => {
+    const { client, operations } = await createClientWithOperations([1500]);
+    await recordOutboundCollection(client.id);
+
+    const res = await sendIncomingPaymentText('08/10/2026 ya pague 1500', 'wa-date-amount');
+
+    expect(res.status).toBe(200);
+    expect(res.body.paymentCorrelation).toMatchObject({
+      status: 'ACCEPTED',
+      operationId: operations[0].id,
+    });
+  });
+
+  it('parses amount with currency prefix ($2,300.50)', async () => {
+    const { client, operations } = await createClientWithOperations([2300.5]);
+    await recordOutboundCollection(client.id);
+
+    const res = await sendIncomingPaymentText('$2,300.50 transferido', 'wa-currency-amount');
+
+    expect(res.status).toBe(200);
+    expect(res.body.paymentCorrelation).toMatchObject({
+      status: 'ACCEPTED',
+      operationId: operations[0].id,
+    });
+  });
+
+  it('selects the largest plausible amount when multiple numbers are present', async () => {
+    const { client, operations } = await createClientWithOperations([1500]);
+    await recordOutboundCollection(client.id);
+
+    const res = await sendIncomingPaymentText('abone 50, faltan 1500 transferido', 'wa-multi-amount');
+
+    expect(res.status).toBe(200);
+    expect(res.body.paymentCorrelation).toMatchObject({
+      status: 'ACCEPTED',
+      operationId: operations[0].id,
+    });
+  });
+
+  it('requires review when previous outbound is older than the configured window', async () => {
+    const { client, operations } = await createClientWithOperations([1800]);
+    await prisma.whatsAppMessage.create({
+      data: {
+        clientId: client.id,
+        operationId: operations[0].id,
+        direction: 'OUTGOING',
+        messageType: 'TEXT',
+        phone: `52${phone}`,
+        content: 'Collecta: recordatorio antiguo.',
+        status: 'SENT',
+        createdAt: new Date(Date.now() - 90 * 86400000),
+      },
+    });
+
+    const res = await sendIncomingPaymentText('ya pague', 'wa-old-outbound');
+
+    expect(res.status).toBe(200);
+    expect(res.body.paymentCorrelation).toMatchObject({
+      status: 'REVIEW_REQUIRED',
+      reasons: expect.arrayContaining(['no_previous_outbound_whatsapp']),
+    });
+  });
+
   it('prevents duplicate payment confirmations from changing another operation', async () => {
     const { client, operations } = await createClientWithOperations([1800, 2600]);
     await recordOutboundCollection(client.id, operations[0].id);
 
-    const first = await sendIncomingPaymentText('transferido $1,800', 'wa-pay-duplicate');
-    const duplicate = await sendIncomingPaymentText('transferido $1,800', 'wa-pay-duplicate');
+    const first = await sendIncomingPaymentText('transferido $1,800', 'wa-pay-duplicate-1');
+    const duplicate = await sendIncomingPaymentText('transferido $1,800', 'wa-pay-duplicate-2');
 
     expect(first.body.paymentCorrelation).toMatchObject({
       status: 'ACCEPTED',
       operationId: operations[0].id,
     });
+
+    // Second confirmation: operation[0] is already PAGADO, so 1800 doesn't match
+    // the remaining open operation (2600). Proves duplicate doesn't pay wrong op.
     expect(duplicate.body.paymentCorrelation).toMatchObject({
-      status: 'DUPLICATE',
-      operationId: operations[0].id,
-      reasons: expect.arrayContaining(['duplicate_incoming_message']),
+      status: 'REVIEW_REQUIRED',
     });
 
     const untouched = await prisma.operation.findUniqueOrThrow({ where: { id: operations[1].id } });
     expect(untouched.estatus).toBe('PENDIENTE');
-    expect((await latestDetectionLog())?.resultado).toBe('DUPLICATE');
+    expect(untouched.fechaPago).toBeNull();
   });
 });

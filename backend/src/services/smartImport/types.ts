@@ -50,6 +50,8 @@ export interface MappingCandidate {
   field: CanonicalField;
   confidence: number;
   reasonCodes: string[];
+  assumptions?: string[];
+  alternatives?: Array<{ field: CanonicalField; confidence: number; reasonCodes: string[] }>;
 }
 
 export interface DetectedRegion {
@@ -59,6 +61,7 @@ export interface DetectedRegion {
   endRow: number;
   startColumn: number;
   endColumn: number;
+  headerRows: number[];
   dataStartRow: number;
   headerLabels: string[];
   confidence: number;

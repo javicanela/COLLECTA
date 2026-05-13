@@ -78,12 +78,40 @@ function hasRejectedPaymentLanguage(text: string): boolean {
 }
 
 function parseAmountFromText(rawText: string): number | null {
-  const matches = rawText.match(/(?:\$|\bmxn\b|\bm\.n\.\b)?\s*(\d{1,3}(?:,\d{3})+|\d+)(\.\d{1,2})?/gi) || [];
-  const amounts = matches
-    .map(match => Number(match.replace(/\b(mxn|m\.n\.)\b/gi, '').replace(/[$,\s]/g, '')))
-    .filter(amount => Number.isFinite(amount) && amount > 0);
+  const datePattern = /^\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}$/;
+  const tokens = rawText.split(/\s+/);
 
-  return amounts.length > 0 ? amounts[0] : null;
+  let currencyPrefixed: number | null = null;
+  const amounts: number[] = [];
+
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i].trim();
+    if (!token || datePattern.test(token)) continue;
+
+    const isCurrencyPrefix = /^[$]$/i.test(token) || /^(mxn|m\.n\.)$/i.test(token);
+
+    let rawNum: string;
+    if (isCurrencyPrefix && i + 1 < tokens.length) {
+      rawNum = tokens[i + 1];
+    } else {
+      rawNum = token;
+    }
+
+    const cleaned = rawNum.replace(/[$,\s]/g, '');
+    const num = Number(cleaned);
+
+    if (!Number.isFinite(num) || num < 10) continue;
+
+    if (isCurrencyPrefix || /^\$/.test(token) || /^(mxn|m\.n\.)/i.test(token)) {
+      currencyPrefixed = num;
+    } else {
+      amounts.push(num);
+    }
+  }
+
+  if (currencyPrefixed !== null) return currencyPrefixed;
+  if (amounts.length > 0) return Math.max(...amounts);
+  return null;
 }
 
 async function writeDetectionLog(
@@ -344,11 +372,17 @@ export async function correlateIncomingWhatsAppPaymentConfirmation(
     return { status: 'REVIEW_REQUIRED', reasons, confidence: 0.15 };
   }
 
+  const PREVIOUS_OUTBOUND_WINDOW_DAYS = Number(
+    process.env.PAYMENT_OUTBOUND_WINDOW_DAYS || 60
+  );
+  const cutoff = new Date(Date.now() - PREVIOUS_OUTBOUND_WINDOW_DAYS * 86400000);
+
   const previousOutbound = await prisma.whatsAppMessage.findFirst({
     where: {
       clientId: client.id,
       direction: 'OUTGOING',
       phone: { contains: phoneLast10 },
+      createdAt: { gte: cutoff },
     },
     orderBy: { createdAt: 'desc' },
   });

@@ -1,8 +1,17 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect } from 'vitest';
 import * as jwt from 'jsonwebtoken';
 import { req, TEST_AUTH } from './test-app';
+import { clearRateLimitBuckets } from '../middleware/rateLimit';
+import { clearAllRevocations } from '../services/tokenRevocation';
 
 describe('Auth middleware', () => {
+  beforeEach(() => {
+    // Isolate auth-related counters so the rate limiter and the revocation
+    // blocklist do not leak state across test files in the same suite.
+    clearRateLimitBuckets();
+    clearAllRevocations();
+  });
+
   it('rejects requests without Authorization header → 401', async () => {
     const res = await req.get('/api/clients');
     expect(res.status).toBe(401);

@@ -57,9 +57,16 @@ vi.mock('../lib/prisma', () => ({
           const clientOk = where?.clientId ? message.clientId === where.clientId : true;
           const directionOk = where?.direction ? message.direction === where.direction : true;
           const phoneOk = where?.phone?.contains ? String(message.phone || '').includes(where.phone.contains) : true;
-          return clientOk && directionOk && phoneOk;
+          const evolutionOk = where?.evolutionMsgId ? message.evolutionMsgId === where.evolutionMsgId : true;
+          return clientOk && directionOk && phoneOk && evolutionOk;
         }) ?? null
       ),
+      update: vi.fn(async ({ where, data }: any) => {
+        const index = db.messages.findIndex((m: any) => m.id === where.id);
+        if (index === -1) return null;
+        db.messages[index] = { ...db.messages[index], ...data };
+        return db.messages[index];
+      }),
     },
     operation: {
       findMany: vi.fn(async () => []),
@@ -300,7 +307,7 @@ describe('POST /api/webhooks/evolution', () => {
       phone: '526647654321',
       content: 'Ya pague',
       evolutionMsgId: 'incoming-1',
-      status: 'RECEIVED',
+      status: 'REVIEW_REQUIRED',
     });
 
     expect(db.logs[0]).toMatchObject({

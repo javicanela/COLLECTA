@@ -1,6 +1,7 @@
 param(
   [int]$BackendPort = 3001,
-  [int]$FrontendPort = 5173
+  [int]$FrontendPort = 5173,
+  [switch]$Force
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,6 +12,17 @@ $logDir = Join-Path $env:TEMP "collecta-dev"
 $pidFile = Join-Path $logDir "collecta-dev-pids.txt"
 
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+
+if ($Force -and (Test-Path $pidFile)) {
+  Write-Host "[collecta-dev] Force mode: deteniendo procesos previos..."
+  Get-Content $pidFile | ForEach-Object {
+    if ($_ -match '=(\d+)$') {
+      Stop-Process -Id $Matches[1] -ErrorAction SilentlyContinue
+    }
+  }
+  Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
+}
+
 if (Test-Path $pidFile) {
   Remove-Item -LiteralPath $pidFile -Force
 }
@@ -62,6 +74,18 @@ function Start-CollectaProcess {
 Write-Host "[collecta-dev] Repo: $repoRoot"
 Write-Host "[collecta-dev] Logs: $logDir"
 
+function Wait-HttpReady {
+  param([string]$Url, [int]$TimeoutSec = 30)
+  $deadline = (Get-Date).AddSeconds($TimeoutSec)
+  while ((Get-Date) -lt $deadline) {
+    try {
+      $r = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 2
+      if ($r.StatusCode -lt 500) { return $true }
+    } catch { Start-Sleep -Milliseconds 500 }
+  }
+  return $false
+}
+
 Invoke-Step "Prepare safe test database" $backendDir "npm run test:prepare"
 
 $backendOut = Join-Path $logDir "backend.out.log"
@@ -78,6 +102,13 @@ if (Test-Path (Join-Path $backendDir ".env.test")) {
 $frontendCommand = "set VITE_API_URL=http://localhost:$BackendPort/api&& npm run dev -- --host 127.0.0.1 --port $FrontendPort"
 
 Start-CollectaProcess "backend" $backendDir $backendCommand $backendOut $backendErr | Out-Null
+
+Write-Host "[collecta-dev] Esperando backend en /api/health"
+$ready = Wait-HttpReady "http://localhost:$BackendPort/api/health" 30
+if (-not $ready) {
+  Write-Warning "Backend no respondio a /api/health en 30s. El frontend arrancara igual."
+}
+
 Start-CollectaProcess "frontend" $frontendDir $frontendCommand $frontendOut $frontendErr | Out-Null
 
 Write-Host ""
