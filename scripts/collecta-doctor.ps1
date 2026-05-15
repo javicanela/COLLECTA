@@ -163,17 +163,27 @@ if ($drive) {
 
 $envTest = Join-Path $repoRoot "backend\.env.test"
 if (Test-Path $envTest) {
-  Write-Check "backend/.env.test" "OK"
-  $required = @('DATABASE_URL','JWT_SECRET','API_KEY','ADMIN_USER','ADMIN_PASS')
-  $contentLines = Get-Content $envTest
+  Write-Check "backend/.env.test" "OK" "file present"
+  $required = @('DATABASE_URL', 'JWT_SECRET', 'API_KEY', 'ADMIN_USER', 'ADMIN_PASS')
+  $contentLines = Get-Content -LiteralPath $envTest
   foreach ($key in $required) {
-    if (-not ($contentLines -match "^$key=")) {
-      Add-Warning "backend/.env.test no define $key"
+    $found = $false
+    foreach ($line in $contentLines) {
+      if ($line -match "^\s*$([regex]::Escape($key))\s*=") {
+        $found = $true
+        break
+      }
+    }
+    if ($found) {
+      Write-Check "backend/.env.test [$key]" "OK" "present"
+    } else {
+      Write-Check "backend/.env.test [$key]" "WARNING" "missing"
+      Add-Warning "backend/.env.test does not define $key. DB-backed tests that depend on this variable will fail."
     }
   }
 } else {
-  Write-Check "backend/.env.test" "MISSING"
-  Add-Issue "Falta backend/.env.test. Sin el, npm run test:prepare falla."
+  Write-Check "backend/.env.test" "MISSING" "file not found"
+  Add-Warning "backend/.env.test is missing. Default backend npm test still runs unit tests; copy backend/.env.test.example before npm run test:full."
 }
 
 $backendNodeModules = Join-Path $repoRoot "backend\node_modules"

@@ -9,13 +9,19 @@ describe('evaluateTestDbSafety', () => {
   it('rejects empty URL', () => {
     const r = evaluateTestDbSafety('', testEnv);
     expect(r.safe).toBe(false);
-    expect(r.reason).toContain('vacio');
+    expect(r.reason).toContain('empty');
+  });
+
+  it('rejects invalid URL syntax', () => {
+    const r = evaluateTestDbSafety('not-a-url', testEnv);
+    expect(r.safe).toBe(false);
+    expect(r.reason).toContain('valid URL');
   });
 
   it('rejects Neon production URL', () => {
     const r = evaluateTestDbSafety('postgresql://user:pass@db.neon.tech:5432/prod', testEnv);
     expect(r.safe).toBe(false);
-    expect(r.reason).toContain('produccion');
+    expect(r.reason).toContain('production provider');
   });
 
   it('rejects Railway production URL', () => {
@@ -26,7 +32,7 @@ describe('evaluateTestDbSafety', () => {
   it('rejects unknown host without test marker', () => {
     const r = evaluateTestDbSafety('postgresql://user:pass@some-random-host.com:5432/db', prodEnv);
     expect(r.safe).toBe(false);
-    expect(r.reason).toContain('host local');
+    expect(r.reason).toContain('allowed local host');
   });
 
   it('accepts localhost URL', () => {
@@ -41,6 +47,11 @@ describe('evaluateTestDbSafety', () => {
 
   it('accepts collecta-test-postgres Docker host', () => {
     const r = evaluateTestDbSafety('postgresql://user:pass@collecta-test-postgres:5432/collecta_test', testEnv);
+    expect(r.safe).toBe(true);
+  });
+
+  it('accepts postgres Docker service host', () => {
+    const r = evaluateTestDbSafety('postgresql://user:pass@postgres:5432/collecta_test', testEnv);
     expect(r.safe).toBe(true);
   });
 

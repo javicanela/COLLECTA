@@ -1,4 +1,6 @@
-param()
+param(
+  [switch]$Full
+)
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
@@ -40,16 +42,21 @@ function Invoke-TestStep {
 }
 
 Write-Host "[collecta-test] Repo: $repoRoot"
+Write-Host "[collecta-test] Mode: $(if ($Full) { 'full DB-backed verification' } else { 'safe local verification' })"
 
-Invoke-TestStep "backend test DB prepare" $backendDir "npm run test:prepare"
-Invoke-TestStep "frontend build" $frontendDir "npm run build"
 Invoke-TestStep "frontend tests" $frontendDir "npm test"
+Invoke-TestStep "frontend build" $frontendDir "npm run build"
+Invoke-TestStep "backend unit tests" $backendDir "npm test"
 Invoke-TestStep "backend build" $backendDir "npm run build"
-Invoke-TestStep "backend full tests" $backendDir "npm run test:full"
+
+if ($Full) {
+  Invoke-TestStep "backend test DB prepare" $backendDir "npm run test:prepare"
+  Invoke-TestStep "backend full tests" $backendDir "npm run test:full"
+}
 
 Write-Host ""
 Write-Host "[collecta-test] Summary:"
 foreach ($result in $results) {
   Write-Host " - $result"
 }
-Write-Host "[collecta-test] OK. Build and test suite passed."
+Write-Host "[collecta-test] OK. Requested checks passed."

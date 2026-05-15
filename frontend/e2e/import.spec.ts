@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type APIRequestContext } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -9,12 +9,12 @@ const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'test-admin-password';
 const FIXTURE_PATH = path.resolve(__dirname, 'fixtures', '3-clientes.csv');
 
-async function loginViaApi(request: any): Promise<string> {
+async function loginViaApi(request: APIRequestContext): Promise<string> {
   const res = await request.post(`${API_BASE}/auth/login`, {
     data: { email: ADMIN_USER, password: ADMIN_PASS },
   });
   expect(res.status()).toBe(200);
-  const body = await res.json();
+  const body = await res.json() as { token: string };
   return body.token as string;
 }
 

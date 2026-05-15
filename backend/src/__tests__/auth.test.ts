@@ -1,8 +1,19 @@
 import { beforeEach, describe, it, expect } from 'vitest';
 import * as jwt from 'jsonwebtoken';
+import express from 'express';
+import request from 'supertest';
 import { req, TEST_AUTH } from './test-app';
 import { clearRateLimitBuckets } from '../middleware/rateLimit';
+import { requireAuth } from '../middleware/auth';
 import { clearAllRevocations } from '../services/tokenRevocation';
+
+function protectedProbe() {
+  const app = express();
+  app.get('/protected', requireAuth, (_req, res) => {
+    res.json({ ok: true });
+  });
+  return request(app);
+}
 
 describe('Auth middleware', () => {
   beforeEach(() => {
@@ -33,8 +44,8 @@ describe('Auth middleware', () => {
   });
 
   it('accepts requests with valid API_KEY token → passes through', async () => {
-    const res = await req
-      .get('/api/clients')
+    const res = await protectedProbe()
+      .get('/protected')
       .set(TEST_AUTH.headers);
     expect(res.status).toBe(200);
   });

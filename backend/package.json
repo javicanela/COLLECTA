@@ -15,7 +15,7 @@
     "db:seed": "node --env-file-if-exists=.env.test -r ts-node/register scripts/seed-demo-data.ts",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
-    "test": "vitest run",
+    "test": "vitest run --config vitest.unit.config.ts",
     "test:full": "npm run test:prepare && node --env-file-if-exists=.env.test ./node_modules/vitest/vitest.mjs run --config vitest.config.ts",
     "test:smoke": "npm run test:prepare && node --env-file-if-exists=.env.test ./node_modules/vitest/vitest.mjs run --config vitest.config.ts src/__tests__/phase8.smoke.test.ts",
     "test:integration": "npm run test:prepare && node --env-file-if-exists=.env.test ./node_modules/vitest/vitest.mjs run --config vitest.config.ts src/__tests__",

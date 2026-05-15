@@ -1,6 +1,7 @@
 param(
   [int]$BackendPort = 3001,
   [int]$FrontendPort = 5173,
+  [int]$ReadinessTimeoutSec = 30,
   [switch]$Force
 )
 
@@ -14,13 +15,19 @@ $pidFile = Join-Path $logDir "collecta-dev-pids.txt"
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 
 if ($Force -and (Test-Path $pidFile)) {
-  Write-Host "[collecta-dev] Force mode: deteniendo procesos previos..."
-  Get-Content $pidFile | ForEach-Object {
-    if ($_ -match '=(\d+)$') {
-      Stop-Process -Id $Matches[1] -ErrorAction SilentlyContinue
+  Write-Host "[collecta-dev] -Force: stopping previous PIDs from $pidFile"
+  Get-Content -LiteralPath $pidFile | ForEach-Object {
+    if ($_ -match '^(.+)=(\d+)$') {
+      $oldName = $Matches[1]
+      $oldPid = [int]$Matches[2]
+      try {
+        Stop-Process -Id $oldPid -Force -ErrorAction Stop
+        Write-Host "[collecta-dev] stopped previous $oldName (PID $oldPid)"
+      } catch {
+        Write-Host "[collecta-dev] previous $oldName (PID $oldPid) was already gone"
+      }
     }
   }
-  Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
 }
 
 if (Test-Path $pidFile) {
@@ -103,10 +110,13 @@ $frontendCommand = "set VITE_API_URL=http://localhost:$BackendPort/api&& npm run
 
 Start-CollectaProcess "backend" $backendDir $backendCommand $backendOut $backendErr | Out-Null
 
-Write-Host "[collecta-dev] Esperando backend en /api/health"
-$ready = Wait-HttpReady "http://localhost:$BackendPort/api/health" 30
-if (-not $ready) {
-  Write-Warning "Backend no respondio a /api/health en 30s. El frontend arrancara igual."
+Write-Host "[collecta-dev] Waiting for backend readiness on /api/health (timeout ${ReadinessTimeoutSec}s)..."
+$healthUrl = "http://localhost:$BackendPort/api/health"
+$ready = Wait-HttpReady -Url $healthUrl -TimeoutSec $ReadinessTimeoutSec
+if ($ready) {
+  Write-Host "[collecta-dev] Backend is reachable at $healthUrl"
+} else {
+  Write-Warning "[collecta-dev] Backend did not respond at $healthUrl within ${ReadinessTimeoutSec}s. Frontend will start anyway; check $backendErr for errors."
 }
 
 Start-CollectaProcess "frontend" $frontendDir $frontendCommand $frontendOut $frontendErr | Out-Null
@@ -117,4 +127,5 @@ Write-Host "[collecta-dev] Frontend URL: http://localhost:$FrontendPort/"
 Write-Host "[collecta-dev] PID file:     $pidFile"
 Write-Host ""
 Write-Host "[collecta-dev] Stop services started by this script with:"
-Write-Host "Get-Content '$pidFile' | ForEach-Object { if (`$_ -match '=(\d+)$') { Stop-Process -Id `$Matches[1] -ErrorAction SilentlyContinue } }"
+Write-Host "  .\scripts\collecta-stop.ps1"
+Write-Host "  # or manually: Get-Content '$pidFile' | ForEach-Object { if (`$_ -match '=(\d+)$') { Stop-Process -Id `$Matches[1] -ErrorAction SilentlyContinue } }"
