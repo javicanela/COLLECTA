@@ -1,21 +1,22 @@
-import { useEffect } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import ErrorBoundary from './components/ErrorBoundary';
 import MainLayout from './components/MainLayout';
 import LoginView from './views/LoginView';
-import DashboardView from './views/DashboardView';
-import DirectoryView from './views/DirectoryView';
-import RegistersView from './views/RegistersView';
-import ConfigView from './views/ConfigView';
-import ExportView from './views/ExportView';
-import UIPreview from './views/UIPreview';
-import LogView from './views/LogView';
-import AgentView from './views/AgentView';
-import PaymentReviewView from './views/PaymentReviewView';
-import SystemReadinessView from './views/SystemReadinessView';
 import { useAuthStore } from './stores/useAuthStore';
 import './App.css';
+
+const DashboardView = lazy(() => import('./views/DashboardView'));
+const DirectoryView = lazy(() => import('./views/DirectoryView'));
+const RegistersView = lazy(() => import('./views/RegistersView'));
+const ConfigView = lazy(() => import('./views/ConfigView'));
+const ExportView = lazy(() => import('./views/ExportView'));
+const UIPreview = lazy(() => import('./views/UIPreview'));
+const LogView = lazy(() => import('./views/LogView'));
+const AgentView = lazy(() => import('./views/AgentView'));
+const PaymentReviewView = lazy(() => import('./views/PaymentReviewView'));
+const SystemReadinessView = lazy(() => import('./views/SystemReadinessView'));
 
 const pageVariants = {
   initial: {
@@ -51,27 +52,37 @@ function AnimatedRoute({ children }: { children: React.ReactNode }) {
   );
 }
 
+function RouteLoadingView() {
+  return (
+    <div className="flex min-h-[320px] items-center justify-center text-sm font-semibold text-slate-500">
+      Cargando...
+    </div>
+  );
+}
+
 function AppRoutes() {
   const location = useLocation();
 
   return (
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<AnimatedRoute><DashboardView /></AnimatedRoute>} />
-          <Route path="directorio" element={<AnimatedRoute><DirectoryView /></AnimatedRoute>} />
-          <Route path="registros" element={<AnimatedRoute><RegistersView /></AnimatedRoute>} />
-          <Route path="exportar" element={<AnimatedRoute><ExportView /></AnimatedRoute>} />
-          <Route path="agente" element={<AnimatedRoute><AgentView /></AnimatedRoute>} />
-          <Route path="pagos/revision" element={<AnimatedRoute><PaymentReviewView /></AnimatedRoute>} />
-          <Route path="sistema/diagnostico" element={<AnimatedRoute><SystemReadinessView /></AnimatedRoute>} />
-          <Route path="config" element={<AnimatedRoute><ConfigView /></AnimatedRoute>} />
-          {import.meta.env.DEV && <Route path="ui-preview" element={<AnimatedRoute><UIPreview /></AnimatedRoute>} />}
-          <Route path="logs" element={<AnimatedRoute><LogView /></AnimatedRoute>} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
-    </AnimatePresence>
+    <Suspense fallback={<RouteLoadingView />}>
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
+          <Route path="/" element={<MainLayout />}>
+            <Route index element={<AnimatedRoute><DashboardView /></AnimatedRoute>} />
+            <Route path="directorio" element={<AnimatedRoute><DirectoryView /></AnimatedRoute>} />
+            <Route path="registros" element={<AnimatedRoute><RegistersView /></AnimatedRoute>} />
+            <Route path="exportar" element={<AnimatedRoute><ExportView /></AnimatedRoute>} />
+            <Route path="agente" element={<AnimatedRoute><AgentView /></AnimatedRoute>} />
+            <Route path="pagos/revision" element={<AnimatedRoute><PaymentReviewView /></AnimatedRoute>} />
+            <Route path="sistema/diagnostico" element={<AnimatedRoute><SystemReadinessView /></AnimatedRoute>} />
+            <Route path="config" element={<AnimatedRoute><ConfigView /></AnimatedRoute>} />
+            {import.meta.env.DEV && <Route path="ui-preview" element={<AnimatedRoute><UIPreview /></AnimatedRoute>} />}
+            <Route path="logs" element={<AnimatedRoute><LogView /></AnimatedRoute>} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </AnimatePresence>
+    </Suspense>
   );
 }
 
