@@ -38,7 +38,8 @@ Ruta recomendada:
 
 ```powershell
 .\scripts\collecta-doctor.ps1
-.\scripts\collecta-dev.ps1
+.\scripts\collecta-setup.ps1
+.\scripts\collecta-start.ps1 -Force
 ```
 
 Consulta `docs/runbooks/ENVIRONMENT_SETUP.md` para instalacion completa, DB de
@@ -110,6 +111,10 @@ proveedor externo en requisito.
 - `docs/PLAN_DEFINITIVO_COLLECTA.md`: plan maestro.
 - `docs/README.md`: indice de documentacion.
 - `docs/runbooks/README.md`: instalacion, QA, secretos, plataformas y handoff.
+- `docs/runbooks/ABRE_FACIL_VERSION_FINAL.md`: setup abre-facil, PWA y flujo
+  operativo para despacho.
+- `docs/checklists/IMPLEMENTACION_DESPACHO_FINAL.md`: checklist final de
+  aceptacion operativa.
 - `docs/specs/`: especificaciones vigentes.
 - `docs/specs/smart-import-super-identifier.md`: especificacion del importador avanzado.
 - `n8n/README.md`: configuracion de workflows y autenticacion.

@@ -4,7 +4,7 @@
   "description": "Collecta V5 Backend API",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "nodemon --exec \"node --max-old-space-size=4096 -r ts-node/register src/index.ts\"",
+    "dev": "set TS_NODE_FILES=true&& nodemon --exec \"node --max-old-space-size=4096 -r ts-node/register src/index.ts\"",
     "build": "tsc",
     "start": "node dist/index.js",
     "db:push": "prisma db push",

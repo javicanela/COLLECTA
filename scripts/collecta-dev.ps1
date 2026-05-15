@@ -101,7 +101,7 @@ $frontendOut = Join-Path $logDir "frontend.out.log"
 $frontendErr = Join-Path $logDir "frontend.err.log"
 
 if (Test-Path (Join-Path $backendDir ".env.test")) {
-  $backendCommand = 'node --env-file-if-exists=.env.test ./node_modules/nodemon/bin/nodemon.js --exec "node --max-old-space-size=4096 -r ts-node/register src/index.ts"'
+  $backendCommand = 'set TS_NODE_FILES=true&& node --env-file-if-exists=.env.test ./node_modules/nodemon/bin/nodemon.js --exec "node --max-old-space-size=4096 -r ts-node/register src/index.ts"'
 } else {
   $backendCommand = "npm run dev"
 }

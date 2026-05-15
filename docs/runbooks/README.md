@@ -15,6 +15,8 @@ depender de memoria tribal ni servicios pagados.
   Neon, Supabase, Firebase, n8n y Evolution API con fallback local.
 - [Operator handoff](OPERATOR_HANDOFF.md): guia corta para operar, verificar,
   leer logs y escalar login externo.
+- [Abre facil version final](ABRE_FACIL_VERSION_FINAL.md): setup, arranque,
+  PWA, offline y operacion diaria para despacho.
 
 ## Scripts locales
 
@@ -22,6 +24,8 @@ Desde la raiz del repo:
 
 ```powershell
 .\scripts\collecta-doctor.ps1
+.\scripts\collecta-setup.ps1
+.\scripts\collecta-start.ps1 -Force
 .\scripts\collecta-test.ps1
 .\scripts\collecta-dev.ps1
 ```

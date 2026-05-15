@@ -8,6 +8,8 @@ Indice operativo de documentacion vigente.
   producto.
 - [Runbooks](runbooks/README.md): instalacion, pruebas, QA browser, seguridad de
   secretos, plataformas gratis y handoff.
+- [Checklist implementacion despacho final](checklists/IMPLEMENTACION_DESPACHO_FINAL.md):
+  aceptacion manual para setup, PWA, Smart Import, cobranza y exportacion.
 - [n8n](../n8n/README.md): workflows, autenticacion y smoke tests.
 
 ## Runbooks principales
@@ -17,6 +19,7 @@ Indice operativo de documentacion vigente.
 - [Secrets and env safety](runbooks/SECRETS_AND_ENV_SAFETY.md)
 - [Free platform options](runbooks/FREE_PLATFORM_OPTIONS.md)
 - [Operator handoff](runbooks/OPERATOR_HANDOFF.md)
+- [Abre facil version final](runbooks/ABRE_FACIL_VERSION_FINAL.md)
 
 ## Reportes
 

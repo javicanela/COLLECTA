@@ -1,7 +1,9 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { AlertCircle, FileSpreadsheet, RefreshCcw, UploadCloud } from 'lucide-react';
 import { Card } from '../../../components/ui/Card';
+import { InlineAlert } from '../../../components/ui/InlineAlert';
+import { useBrowserOnlineStatus } from '../../../hooks/useConnectivityStatus';
 import { parsedDocumentToWorkbookSheets } from '../domain/parsed-document-to-workbook';
 import { runSmartImportEscalation } from '../domain/provider-registry';
 import { buildCanonicalRows } from '../domain/super-identifier';
@@ -12,6 +14,7 @@ import { ImportSummary } from './ImportSummary';
 import { MappingReviewTable } from './MappingReviewTable';
 import { PreviewGrid } from './PreviewGrid';
 import { SheetSelector } from './SheetSelector';
+import { clearImportDraft, loadImportDraft, saveImportDraft } from './import-draft';
 
 type ImportStatus = 'idle' | 'reading' | 'extracting_text' | 'ocr_running' | 'analyzing' | 'ready_for_review' | 'error' | 'cancelled';
 
@@ -36,15 +39,17 @@ export interface ImportWizardProps {
 }
 
 export function ImportWizard({ onCommit, isCommitting }: ImportWizardProps = {}) {
-  const [source, setSource] = useState<SmartImportSource | null>(null);
-  const [sheets, setSheets] = useState<WorkbookSheetSummary[]>([]);
-  const [analysis, setAnalysis] = useState<SmartImportAnalysis | null>(null);
-  const [selectedSheetId, setSelectedSheetId] = useState('');
-  const [selectedRegionId, setSelectedRegionId] = useState('');
-  const [corrections, setCorrections] = useState<Record<number, CanonicalField | ''>>({});
-  const [status, setStatus] = useState<ImportStatus>('idle');
+  const initialDraft = useMemo(() => loadImportDraft(), []);
+  const isBrowserOnline = useBrowserOnlineStatus();
+  const [source, setSource] = useState<SmartImportSource | null>(initialDraft?.source ?? null);
+  const [sheets, setSheets] = useState<WorkbookSheetSummary[]>(initialDraft?.sheets ?? []);
+  const [analysis, setAnalysis] = useState<SmartImportAnalysis | null>(initialDraft?.analysis ?? null);
+  const [selectedSheetId, setSelectedSheetId] = useState(initialDraft?.selectedSheetId ?? '');
+  const [selectedRegionId, setSelectedRegionId] = useState(initialDraft?.selectedRegionId ?? '');
+  const [corrections, setCorrections] = useState<Record<number, CanonicalField | ''>>(initialDraft?.corrections ?? {});
+  const [status, setStatus] = useState<ImportStatus>(initialDraft ? 'ready_for_review' : 'idle');
   const [error, setError] = useState<string | null>(null);
-  const [documentWarnings, setDocumentWarnings] = useState<string[]>([]);
+  const [documentWarnings, setDocumentWarnings] = useState<string[]>(initialDraft?.documentWarnings ?? []);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
 
   const runAnalysis = useCallback(async (
@@ -52,6 +57,7 @@ export function ImportWizard({ onCommit, isCommitting }: ImportWizardProps = {})
     nextSheets: WorkbookSheetSummary[],
     preferredSheetId?: string,
     preferredRegionId?: string,
+    nextDocumentWarnings = documentWarnings,
   ) => {
     const nextAnalysis = await runSmartImportEscalation({
       source: nextSource,
@@ -62,9 +68,21 @@ export function ImportWizard({ onCommit, isCommitting }: ImportWizardProps = {})
     setAnalysis(nextAnalysis);
     setSelectedSheetId(nextAnalysis.selectedSheet.sheetId);
     setSelectedRegionId(nextAnalysis.selectedRegion.regionId);
-    setCorrections(correctionsFromMappings(nextAnalysis.mappings));
+    const nextCorrections = correctionsFromMappings(nextAnalysis.mappings);
+    setCorrections(nextCorrections);
+    saveImportDraft({
+      draft: {
+        source: nextSource,
+        sheets: nextSheets,
+        analysis: nextAnalysis,
+        selectedSheetId: nextAnalysis.selectedSheet.sheetId,
+        selectedRegionId: nextAnalysis.selectedRegion.regionId,
+        corrections: nextCorrections,
+        documentWarnings: nextDocumentWarnings,
+      },
+    });
     setStatus('ready_for_review');
-  }, []);
+  }, [documentWarnings]);
 
   const processFile = useCallback(async (file: File) => {
     const controller = new AbortController();
@@ -96,7 +114,7 @@ export function ImportWizard({ onCommit, isCommitting }: ImportWizardProps = {})
       setSource(nextSource);
       setSheets(nextSheets);
       setDocumentWarnings(parsedDocument.warnings);
-      await runAnalysis(nextSource, nextSheets);
+      await runAnalysis(nextSource, nextSheets, undefined, undefined, parsedDocument.warnings);
     } catch (err) {
       if (controller.signal.aborted) {
         setStatus('cancelled');
@@ -169,6 +187,21 @@ export function ImportWizard({ onCommit, isCommitting }: ImportWizardProps = {})
     setCorrections((current) => ({ ...current, [columnIndex]: field }));
   }, []);
 
+  useEffect(() => {
+    if (!source || !analysis) return;
+    saveImportDraft({
+      draft: {
+        source,
+        sheets,
+        analysis,
+        selectedSheetId,
+        selectedRegionId,
+        corrections,
+        documentWarnings,
+      },
+    });
+  }, [analysis, corrections, documentWarnings, selectedRegionId, selectedSheetId, sheets, source]);
+
   const reset = useCallback(() => {
     setSource(null);
     setSheets([]);
@@ -179,6 +212,7 @@ export function ImportWizard({ onCommit, isCommitting }: ImportWizardProps = {})
     setStatus('idle');
     setError(null);
     setDocumentWarnings([]);
+    clearImportDraft();
     abortController?.abort();
     setAbortController(null);
   }, [abortController]);
@@ -188,6 +222,8 @@ export function ImportWizard({ onCommit, isCommitting }: ImportWizardProps = {})
     setStatus('cancelled');
     setAbortController(null);
   }, [abortController]);
+
+  const canCommit = Boolean(onCommit && isBrowserOnline);
 
   return (
     <Card variant="solid" padding="normal" className="overflow-hidden">
@@ -244,6 +280,12 @@ export function ImportWizard({ onCommit, isCommitting }: ImportWizardProps = {})
 
       {analysis && (
         <div className="space-y-5">
+          {!isBrowserOnline && (
+            <InlineAlert tone="warning" title="Listo para sincronizar cuando Collecta este conectado">
+              Puedes revisar y ajustar el mapeo sin conexion. La carga final a cartera se habilita al recuperar backend.
+            </InlineAlert>
+          )}
+
           <SheetSelector
             sheets={sheets}
             regions={analysis.detectedRegions}
@@ -281,11 +323,11 @@ export function ImportWizard({ onCommit, isCommitting }: ImportWizardProps = {})
                 <button
                   type="button"
                   className="btn btn-primary btn-sm px-6"
-                  disabled={isCommitting || previewRows.length === 0 || blockingRowCount > 0}
-                  title={blockingRowCount > 0 ? 'Resuelve filas sin cliente o fecha antes de importar' : undefined}
+                  disabled={!canCommit || isCommitting || previewRows.length === 0 || blockingRowCount > 0}
+                  title={!canCommit ? 'Listo para sincronizar cuando Collecta este conectado' : blockingRowCount > 0 ? 'Resuelve filas sin cliente o fecha antes de importar' : undefined}
                   onClick={() => { void onCommit(previewRows); }}
                 >
-                  {isCommitting ? 'Importando...' : 'Confirmar e Importar'}
+                  {isCommitting ? 'Importando...' : isBrowserOnline ? 'Confirmar e Importar' : 'Pendiente de conexion'}
                 </button>
               )}
             </div>

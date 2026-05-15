@@ -5,6 +5,7 @@ import { Sun, Moon, Menu, X, Wallet, LogOut } from 'lucide-react';
 import { useOperationStore } from '../stores/useOperationStore';
 import { useTheme } from '../hooks/useTheme';
 import { useToast } from '../hooks/useToast';
+import { useBrowserOnlineStatus, type CollectaConnectionStatus } from '../hooks/useConnectivityStatus';
 import ToastContainer from './ui/ToastContainer';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -158,8 +159,12 @@ export default function MainLayout() {
   const { user, logout } = useAuthStore();
   const { theme, toggleTheme } = useTheme();
   const { toasts } = useToast();
+  const isBrowserOnline = useBrowserOnlineStatus();
 
   const [activeProvider, setActiveProvider] = useState<string | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<CollectaConnectionStatus>(() =>
+    typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'syncing'
+  );
   const [sysMode, setSysMode] = useState<string>(() =>
     localStorage.getItem('sys_modo') || 'PRUEBA',
   );
@@ -177,6 +182,13 @@ export default function MainLayout() {
   }, [fetchOperations]);
 
   useEffect(() => {
+    if (!isBrowserOnline) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- mirrors browser online/offline events into app status
+      setConnectionStatus('offline');
+      return;
+    }
+
+    setConnectionStatus('syncing');
     const savedModo = localStorage.getItem('sys_modo');
 
     api.get<Record<string, string>>('/config').then(cfg => {
@@ -184,7 +196,8 @@ export default function MainLayout() {
       const modo = cfg['modo'] || cfg['sysModo'] || savedModo || 'PRUEBA';
       setSysMode(modo);
       localStorage.setItem('sys_modo', modo);
-    }).catch(() => {});
+      setConnectionStatus('online');
+    }).catch(() => setConnectionStatus('api_error'));
 
     const pollWaStatus = () => {
       api.get<{ configured: boolean; connected: boolean; state?: string }>('/whatsapp/status')
@@ -225,7 +238,7 @@ export default function MainLayout() {
       clearInterval(readinessInterval);
       window.removeEventListener('modo-changed', handleModoChange);
     };
-  }, []);
+  }, [isBrowserOnline]);
 
   /* ── Responsive ─────────────────────────────────────────────────────── */
 
@@ -375,6 +388,7 @@ export default function MainLayout() {
               sysMode={sysMode}
               waStatus={waStatus}
               activeProvider={activeProvider}
+              connectionStatus={connectionStatus}
               readinessStatus={readinessStatus}
               emailStatus={emailStatus}
               pdfStatus={pdfStatus}

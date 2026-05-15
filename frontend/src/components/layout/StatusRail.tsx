@@ -1,4 +1,5 @@
 import { StatusBadge } from '../ui/StatusBadge';
+import type { CollectaConnectionStatus } from '../../hooks/useConnectivityStatus';
 
 export type WhatsAppConnectionStatus = 'connected' | 'disconnected' | 'not_configured' | 'error';
 export type RailServiceStatus = 'ok' | 'warning' | 'error' | 'unknown';
@@ -10,6 +11,7 @@ export interface StatusRailProps {
   readinessStatus?: RailServiceStatus;
   emailStatus?: RailServiceStatus;
   pdfStatus?: RailServiceStatus;
+  connectionStatus?: CollectaConnectionStatus;
   className?: string;
 }
 
@@ -41,6 +43,20 @@ const serviceLabel: Record<RailServiceStatus, string> = {
   unknown: 'Sin verificar',
 };
 
+const connectionTone: Record<CollectaConnectionStatus, 'success' | 'danger' | 'warning' | 'neutral'> = {
+  online: 'success',
+  offline: 'warning',
+  syncing: 'neutral',
+  api_error: 'danger',
+};
+
+const connectionLabel: Record<CollectaConnectionStatus, string> = {
+  online: 'Collecta Online',
+  offline: 'Collecta Offline',
+  syncing: 'Sincronizando',
+  api_error: 'Error de API',
+};
+
 function normalizeMode(mode: string) {
   return mode.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
 }
@@ -52,6 +68,7 @@ export function StatusRail({
   readinessStatus = 'unknown',
   emailStatus = 'unknown',
   pdfStatus = 'ok',
+  connectionStatus = 'syncing',
   className = '',
 }: StatusRailProps) {
   const isProduction = normalizeMode(sysMode) === 'PRODUCCION';
@@ -66,6 +83,16 @@ export function StatusRail({
         variant="dot"
         pulse={isProduction}
         title={isProduction ? 'Modo produccion activo' : 'Modo prueba: los envios no se ejecutan'}
+      />
+
+      <span className="hidden h-3 w-px bg-[var(--c-border)] sm:block" aria-hidden="true" />
+
+      <StatusBadge
+        label={connectionLabel[connectionStatus]}
+        tone={connectionTone[connectionStatus]}
+        variant="dot"
+        pulse={connectionStatus === 'syncing'}
+        title={connectionStatus === 'offline' ? 'Shell local disponible; sincronizacion requiere backend' : undefined}
       />
 
       <span className="hidden h-3 w-px bg-[var(--c-border)] sm:block" aria-hidden="true" />

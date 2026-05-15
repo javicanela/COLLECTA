@@ -7,6 +7,7 @@ import { useClientStore } from '../stores/useClientStore';
 import type { CanonicalImportRow } from '../features/smart-import/domain/types';
 import type { Client, Operation } from '../types';
 import { useToast } from '../hooks/useToast';
+import { clearImportDraft } from '../features/smart-import/components/import-draft';
 
 type ClientImportPayload = Pick<Client, 'rfc' | 'nombre'> & Partial<Pick<Client, 'telefono' | 'email' | 'regimen' | 'categoria' | 'asesor'>>;
 type OperationImportPayload = Pick<Operation, 'clientId' | 'tipo' | 'monto' | 'fechaVence'> & Partial<Pick<Operation, 'descripcion' | 'asesor'>>;
@@ -187,6 +188,7 @@ export default function RegistersView() {
         toast('ok', successMsg);
       }
 
+      clearImportDraft();
       setWizardKey(current => current + 1);
 
     } catch (error: unknown) {

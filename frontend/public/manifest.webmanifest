@@ -1,0 +1,25 @@
+{
+  "name": "Collecta",
+  "short_name": "Collecta",
+  "description": "Cobranza inteligente para despachos contables.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#090718",
+  "theme_color": "#6d5efc",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
