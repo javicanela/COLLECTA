@@ -47,7 +47,7 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
   
   try {
     rawResponse = await response.text();
-  } catch (e) {
+  } catch {
     rawResponse = '[No se pudo leer la respuesta]';
   }
 
@@ -64,13 +64,15 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
     let errorBody: Record<string, string> = {};
     try {
       errorBody = JSON.parse(rawResponse);
-    } catch {}
+    } catch {
+      // ignore parse errors; we'll fall back to status
+    }
     throw new Error(errorBody.message || errorBody.error || `Error en la petición: ${response.status}`);
   }
 
   try {
     return JSON.parse(rawResponse);
-  } catch (e) {
+  } catch {
     console.error('Error parseando JSON:', rawResponse.substring(0, 500));
     throw new Error('La API respondió pero el formato es inválido (JSON inválido)');
   }
@@ -81,8 +83,8 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
  */
 export const api = {
   get: <T>(endpoint: string) => apiRequest<T>(endpoint),
-  post: <T>(endpoint: string, body: any = {}) => apiRequest<T>(endpoint, { method: 'POST', body: JSON.stringify(body) }),
-  put: <T>(endpoint: string, body: any) => apiRequest<T>(endpoint, { method: 'PUT', body: JSON.stringify(body) }),
-  patch: <T>(endpoint: string, body: any = {}) => apiRequest<T>(endpoint, { method: 'PATCH', body: JSON.stringify(body) }),
+  post: <T>(endpoint: string, body: unknown = {}) => apiRequest<T>(endpoint, { method: 'POST', body: JSON.stringify(body) }),
+  put: <T>(endpoint: string, body: unknown) => apiRequest<T>(endpoint, { method: 'PUT', body: JSON.stringify(body) }),
+  patch: <T>(endpoint: string, body: unknown = {}) => apiRequest<T>(endpoint, { method: 'PATCH', body: JSON.stringify(body) }),
   del: <T>(endpoint: string) => apiRequest<T>(endpoint, { method: 'DELETE' }),
 };

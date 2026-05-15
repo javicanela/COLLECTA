@@ -35,6 +35,12 @@ describe('evaluateTestDbSafety', () => {
     expect(r.reason).toContain('allowed local host');
   });
 
+  it('rejects unknown host without test marker even when NODE_ENV=test', () => {
+    const r = evaluateTestDbSafety('postgresql://user:pass@some-random-host.com:5432/db', testEnv);
+    expect(r.safe).toBe(false);
+    expect(r.reason).toContain('allowed local host');
+  });
+
   it('accepts localhost URL', () => {
     const r = evaluateTestDbSafety('postgresql://user:pass@localhost:5432/collecta_test', testEnv);
     expect(r.safe).toBe(true);

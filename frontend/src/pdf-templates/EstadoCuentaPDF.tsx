@@ -23,7 +23,7 @@ const calcDias = (fechaVence: string | null | undefined): number => {
   return Math.ceil((t - Date.now()) / 86400000);
 };
 
-const safe = (v: any): string => {
+const safe = (v: unknown): string => {
   const s = v?.toString().trim();
   return s || '—';
 };
@@ -223,7 +223,7 @@ export default function EstadoCuentaPDF({ client, operations, config }: EstadoCu
           <View style={{ alignItems: 'flex-start', marginBottom: 8 }}>
             <Image
               src={config['pdf_template_image']}
-              style={{ width: 80, height: 40, objectFit: 'contain' as any }}
+              style={{ width: 80, height: 40, objectFit: 'contain' as const }}
             />
           </View>
         )}

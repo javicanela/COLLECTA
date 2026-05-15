@@ -299,9 +299,9 @@ function ProviderRow({ info, value, onChange, isLastProvider }: ProviderRowProps
         setStatus('error');
         setStatusMsg(result.message || 'Error');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setStatus('error');
-      setStatusMsg(err.message || 'Error de red');
+      setStatusMsg(err instanceof Error ? err.message : 'Error de red');
     }
   };
 
@@ -433,8 +433,8 @@ export default function ConfigView() {
       
       setIsDirty(false);
       toast('ok', 'Configuracion guardada correctamente.');
-    } catch (err: any) {
-      toast('err', err.message || 'Error al guardar la configuracion.');
+    } catch (err: unknown) {
+      toast('err', err instanceof Error ? err.message : 'Error al guardar la configuracion.');
     } finally {
       setIsLoading(false);
     }
@@ -447,8 +447,8 @@ export default function ConfigView() {
       const result = await api.post<{ success: boolean; provider?: string; message?: string; error?: string }>('/extract/test', {});
       setAiResult({ success: result.success, message: result.message || `Conectado via ${result.provider}` });
       if (result.provider) setLastProvider(result.provider);
-    } catch (err: any) {
-      setAiResult({ success: false, message: err.message || 'Error de conexion' });
+    } catch (err: unknown) {
+      setAiResult({ success: false, message: err instanceof Error ? err.message : 'Error de conexion' });
     } finally {
       setAiTesting(false);
     }

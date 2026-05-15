@@ -2,7 +2,7 @@ import { api } from './api';
 import type { Operation, StatementDeliveryResult } from '../types';
 
 export const OperationService = {
-  getAll: (filters?: any) => {
+  getAll: (filters?: Record<string, string>) => {
     const query = filters ? `?${new URLSearchParams(filters).toString()}` : '';
     return api.get<Operation[]>(`/operations${query}`);
   },
@@ -20,6 +20,6 @@ export const OperationService = {
   sendStatement: (id: string, channelPreference: 'WHATSAPP' | 'EMAIL' | 'AUTO' = 'AUTO') =>
     api.post<StatementDeliveryResult>(`/cobranza/operation/${id}/send-statement`, { channelPreference }),
   
-  extract: (data: { headers: string[], rows: any[][], provider?: string }) => 
-    api.post<{ mapping: any, _source: string }>('/extract', data),
+  extract: (data: { headers: string[], rows: unknown[][], provider?: string }) =>
+    api.post<{ mapping: Record<string, unknown>, _source: string }>('/extract', data),
 };

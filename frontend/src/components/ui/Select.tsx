@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useId } from 'react';
 import { ChevronDown, Check, X } from 'lucide-react';
 
 export interface SelectOption {
@@ -44,7 +44,8 @@ export const Select: React.FC<SelectProps> = ({
   const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const listboxRef = useRef<HTMLDivElement>(null);
-  const selectId = id || `select-${Math.random().toString(36).substr(2, 9)}`;
+  const autoId = useId();
+  const selectId = id || `select-${autoId}`;
   const errorId = `${selectId}-error`;
   const helperId = `${selectId}-helper`;
 
@@ -231,7 +232,7 @@ export const Select: React.FC<SelectProps> = ({
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      !option.disabled && handleSelect(option.value);
+                      if (!option.disabled) handleSelect(option.value);
                     }
                   }}
                 >

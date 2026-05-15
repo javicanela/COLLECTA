@@ -25,7 +25,7 @@ const s = StyleSheet.create({
   header: { backgroundColor: '#0c2340', padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 4, marginBottom: 16 },
   headerTitle: { color: '#ffffff', fontSize: 14, fontFamily: 'Helvetica-Bold' },
   headerSub: { color: '#94a3b8', fontSize: 8, marginTop: 3 },
-  headerRight: { alignItems: 'flex-end' as any },
+  headerRight: { alignItems: 'flex-end' as const },
   headerReport: { color: '#e0a020', fontSize: 11, fontFamily: 'Helvetica-Bold' },
   headerDate: { color: '#94a3b8', fontSize: 7, marginTop: 2 },
   // Asesor section
@@ -35,7 +35,7 @@ const s = StyleSheet.create({
   tableHeader: { flexDirection: 'row', backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#cbd5e1', paddingVertical: 4, paddingHorizontal: 4 },
   tableRow: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#e2e8f0', paddingVertical: 3, paddingHorizontal: 4 },
   tableRowAlt: { backgroundColor: '#f8fafc' },
-  th: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#64748b', textTransform: 'uppercase' as any },
+  th: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#64748b', textTransform: 'uppercase' as const },
   td: { fontSize: 8, color: '#334155' },
   tdMono: { fontSize: 8, color: '#334155', fontFamily: 'Courier' },
   tdBold: { fontSize: 8, fontFamily: 'Helvetica-Bold' },
@@ -43,9 +43,9 @@ const s = StyleSheet.create({
   colCliente: { width: '22%' },
   colRfc: { width: '15%' },
   colTipo: { width: '12%' },
-  colMonto: { width: '13%', textAlign: 'right' as any },
+  colMonto: { width: '13%', textAlign: 'right' as const },
   colVence: { width: '13%' },
-  colDias: { width: '10%', textAlign: 'center' as any },
+  colDias: { width: '10%', textAlign: 'center' as const },
   colEstatus: { width: '15%' },
   // Totals
   subtotalRow: { flexDirection: 'row', justifyContent: 'flex-end', paddingVertical: 4, paddingRight: 4, borderTopWidth: 1, borderTopColor: '#cbd5e1' },
@@ -55,7 +55,7 @@ const s = StyleSheet.create({
   grandTotalLabel: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#94a3b8', marginRight: 12 },
   grandTotalAmount: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: '#e03535' },
   // Footer
-  footer: { position: 'absolute' as any, bottom: 20, left: 30, right: 30, flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 0.5, borderTopColor: '#cbd5e1', paddingTop: 6 },
+  footer: { position: 'absolute' as const, bottom: 20, left: 30, right: 30, flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 0.5, borderTopColor: '#cbd5e1', paddingTop: 6 },
   footerText: { fontSize: 7, color: '#94a3b8' },
 });
 

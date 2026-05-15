@@ -1,6 +1,48 @@
 import { api } from './api';
 import * as xlsx from 'xlsx';
 
+type ClientRow = {
+  rfc?: string;
+  nombre?: string;
+  email?: string;
+  telefono?: string;
+  regimen?: string;
+  categoria?: string;
+  asesor?: string;
+  estado?: string;
+  notas?: string;
+  createdAt?: string;
+};
+
+type OperationRow = {
+  asesor?: string;
+  client?: ClientRow;
+  fechaVence?: string;
+  tipo?: string;
+  descripcion?: string;
+  monto?: number;
+  calculatedStatus?: string;
+  estatus?: string;
+  diasRestantes?: number | null;
+  fechaPago?: string;
+  excluir?: boolean;
+  archived?: boolean;
+};
+
+type LogRow = {
+  createdAt?: string;
+  client?: ClientRow;
+  telefono?: string;
+  tipo?: string;
+  variante?: string;
+  modo?: string;
+  resultado?: string;
+  mensaje?: string;
+};
+
+type ExportCellValue = string | number;
+type ExportRow = Record<string, ExportCellValue>;
+
 const fmtDate = (iso: string | null | undefined) => {
   if (!iso) return '';
   const d = new Date(iso);
@@ -13,9 +55,9 @@ const fmtDateTime = (iso: string | null | undefined) => {
   return isNaN(d.getTime()) ? '' : d.toLocaleString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
-const calcDias = (fechaVence: string) => Math.ceil((new Date(fechaVence).getTime() - Date.now()) / 86400000);
+const calcDias = (fechaVence: string | undefined) => fechaVence ? Math.ceil((new Date(fechaVence).getTime() - Date.now()) / 86400000) : 0;
 
-function mapOperaciones(ops: any[]) {
+function mapOperaciones(ops: OperationRow[]) {
   return ops.map(op => ({
     'ASESOR': op.asesor || op.client?.asesor || '',
     'CLIENTE': op.client?.nombre || '',
@@ -34,7 +76,7 @@ function mapOperaciones(ops: any[]) {
   }));
 }
 
-function mapDirectorio(clients: any[]) {
+function mapDirectorio(clients: ClientRow[]) {
   return clients.map(c => ({
     'RFC': c.rfc || '',
     'NOMBRE': c.nombre || '',
@@ -49,7 +91,7 @@ function mapDirectorio(clients: any[]) {
   }));
 }
 
-function mapPagos(ops: any[]) {
+function mapPagos(ops: OperationRow[]) {
   const pagados = ops.filter(o => o.fechaPago || (o.calculatedStatus || o.estatus) === 'PAGADO');
   const rows = pagados.map(op => ({
     'ASESOR': op.asesor || op.client?.asesor || '',
@@ -75,7 +117,7 @@ function mapPagos(ops: any[]) {
   return rows;
 }
 
-function mapLog(logs: any[]) {
+function mapLog(logs: LogRow[]) {
   return logs.map(l => ({
     'FECHA/HORA': fmtDateTime(l.createdAt),
     'CLIENTE': l.client?.nombre || '',
@@ -89,7 +131,7 @@ function mapLog(logs: any[]) {
   }));
 }
 
-function applyWorksheetFormat(worksheet: xlsx.WorkSheet, mapped: Record<string, any>[]) {
+function applyWorksheetFormat(worksheet: xlsx.WorkSheet, mapped: ExportRow[]) {
   if (mapped.length === 0) return;
 
   const cols = Object.keys(mapped[0]);
@@ -122,19 +164,19 @@ export const ExportService = {
     const filename = `collecta_${type}_${fecha}.xlsx`;
 
     try {
-      let mapped: Record<string, any>[] = [];
+      let mapped: ExportRow[] = [];
 
       if (type === 'operaciones') {
-        const ops = await api.get<any[]>('/operations');
+        const ops = await api.get<OperationRow[]>('/operations');
         mapped = mapOperaciones(ops);
       } else if (type === 'directorio') {
-        const cls = await api.get<any[]>('/clients');
+        const cls = await api.get<ClientRow[]>('/clients');
         mapped = mapDirectorio(cls);
       } else if (type === 'pagos') {
-        const ops = await api.get<any[]>('/operations');
+        const ops = await api.get<OperationRow[]>('/operations');
         mapped = mapPagos(ops);
       } else if (type === 'log') {
-        const logs = await api.get<any[]>('/logs');
+        const logs = await api.get<LogRow[]>('/logs');
         mapped = mapLog(logs);
       }
 
@@ -156,7 +198,7 @@ export const ExportService = {
 
   async downloadBackup() {
     try {
-      const backupData = await api.get<any>('/config/backup');
+      const backupData = await api.get<{ data: unknown }>('/config/backup');
       const blob = new Blob([JSON.stringify(backupData.data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

@@ -50,6 +50,8 @@ frontend/playwright-report/
 .playwright-mcp/
 
 # Local AI agent state (not part of Collecta product)
+.agents/
+skills-lock.json
 .ai-control/
 .ai-tasks/
 .ai-logs/

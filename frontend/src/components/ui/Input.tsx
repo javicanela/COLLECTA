@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 
 type InputSize = 'sm' | 'normal' | 'lg';
 
@@ -26,7 +26,8 @@ export const Input: React.FC<InputProps> = ({
   id,
   ...props
 }) => {
-  const inputId = id || `input-${Math.random().toString(36).substr(2, 9)}`;
+  const autoId = useId();
+  const inputId = id || `input-${autoId}`;
   const errorId = `${inputId}-error`;
   const helperId = `${inputId}-helper`;
 
@@ -109,7 +110,8 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({
   id,
   ...props
 }, ref) => {
-  const inputId = id || `textarea-${Math.random().toString(36).substr(2, 9)}`;
+  const autoId = useId();
+  const inputId = id || `textarea-${autoId}`;
   const errorId = `${inputId}-error`;
   const helperId = `${inputId}-helper`;
   const hasError = Boolean(error);

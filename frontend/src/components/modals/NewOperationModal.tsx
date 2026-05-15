@@ -148,8 +148,8 @@ export default function NewOperationModal({ isOpen, onClose }: NewOperationModal
         asesor: asesor || undefined,
       });
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Error al crear operación');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error al crear operación');
     } finally {
       setIsLoading(false);
     }

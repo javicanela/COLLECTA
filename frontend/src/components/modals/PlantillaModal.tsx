@@ -21,8 +21,10 @@ export function PlantillaModal({ isOpen, onClose, plantilla, onSave }: Plantilla
   const [cuerpo, setCuerpo] = useState(plantilla?.valor || '');
   const taRef = useRef<HTMLTextAreaElement>(null);
 
+  // Reset form state when the modal opens or the target plantilla changes.
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- legacy reset-on-open pattern; behavior preserved
       setNombre(plantilla?.nombre || '');
       setCuerpo(plantilla?.valor || '');
     }

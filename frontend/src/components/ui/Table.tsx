@@ -113,7 +113,7 @@ export function Table<T>({
     const rows = displayData.length;
     const cols = columns.filter(c => c.key !== '__select').length;
     
-    let { row: curRow, col: curCol } = focusedCell || { row: -1, col: -1 };
+    const { row: curRow, col: curCol } = focusedCell || { row: -1, col: -1 };
     
     switch (e.key) {
       case 'ArrowRight':
@@ -146,7 +146,7 @@ export function Table<T>({
         setFocusedCell({ row: curRow, col: cols - 1 });
         break;
     }
-  }, [displayData.length, columns.length, focusedCell, selectable, onSelectRow, isMobile]);
+  }, [displayData, columns, focusedCell, selectable, onSelectRow, isMobile]);
 
   useEffect(() => {
     const checkMobile = () => {

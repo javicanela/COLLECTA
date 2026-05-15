@@ -3,6 +3,22 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const DEFAULT_TIMEOUT_MS = 45_000;
+const PROD_HOST_PATTERNS = [
+  'neon.tech',
+  'neon.db',
+  'railway.app',
+  'supabase.co',
+  'supabase.in',
+  'heroku',
+  'amazonaws.com',
+  'rds.amazonaws',
+  'azure.com',
+  'azurewebsites',
+  'render.com',
+  'render.app',
+  'vercel.app',
+  'planetscale',
+];
 
 function fail(message, details = []) {
   console.error(`\n[test-db] ${message}`);
@@ -25,6 +41,10 @@ function isSafeTestDatabase(databaseUrl) {
   const username = decodeURIComponent(parsed.username || '').toLowerCase();
   const marker = `${host} ${databaseName} ${username}`;
   const localHosts = new Set(['localhost', '127.0.0.1', '::1']);
+
+  if (PROD_HOST_PATTERNS.some(pattern => host.includes(pattern))) {
+    return false;
+  }
 
   return (
     localHosts.has(host) ||

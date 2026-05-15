@@ -10,7 +10,7 @@
     "db:push": "prisma db push",
     "db:test:push": "node --env-file-if-exists=.env.test ./node_modules/prisma/build/index.js db push --skip-generate",
     "test:db:ensure": "node --env-file-if-exists=.env.test scripts/ensure-test-db.js",
-    "test:prepare": "npm run test:db:ensure && npm run db:test:push",
+    "test:prepare": "npm run db:guard && npm run test:db:ensure && npm run db:test:push",
     "db:guard": "node --env-file-if-exists=.env.test -r ts-node/register scripts/assert-safe-test-db.ts",
     "db:seed": "node --env-file-if-exists=.env.test -r ts-node/register scripts/seed-demo-data.ts",
     "db:generate": "prisma generate",

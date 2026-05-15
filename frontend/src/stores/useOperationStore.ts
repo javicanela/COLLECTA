@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import type { Operation, OperationEstatus } from '../types';
 import { OperationService } from '../services/operationService';
 
+const getErrorMessage = (err: unknown): string =>
+  err instanceof Error ? err.message : 'Error desconocido';
+
 interface OperationStore {
   operations: Operation[];
   archivedOperations: Operation[];
@@ -10,7 +13,7 @@ interface OperationStore {
   isLoadingArchived: boolean;
   error: string | null;
   vencidasCount: number;
-  fetchOperations: (filters?: any) => Promise<void>;
+  fetchOperations: (filters?: Record<string, string>) => Promise<void>;
   fetchArchivedOperations: () => Promise<void>;
   setFilterStatus: (status: OperationEstatus | 'TODOS') => void;
   markAsPaid: (id: string) => Promise<void>;
@@ -37,8 +40,8 @@ export const useOperationStore = create<OperationStore>((set, get) => ({
       const operations = await OperationService.getAll(filters);
       const vencidas = operations.filter(op => (op.calculatedStatus || op.estatus) === 'VENCIDO').length;
       set({ operations, vencidasCount: vencidas, isLoading: false });
-    } catch (err: any) {
-      set({ error: err.message, isLoading: false });
+    } catch (err: unknown) {
+      set({ error: getErrorMessage(err), isLoading: false });
     }
   },
 
@@ -47,8 +50,8 @@ export const useOperationStore = create<OperationStore>((set, get) => ({
     try {
       const archivedOperations = await OperationService.getAll({ archived: 'true' });
       set({ archivedOperations, isLoadingArchived: false });
-    } catch (err: any) {
-      set({ error: err.message, isLoadingArchived: false });
+    } catch (err: unknown) {
+      set({ error: getErrorMessage(err), isLoadingArchived: false });
     }
   },
 
@@ -62,8 +65,8 @@ export const useOperationStore = create<OperationStore>((set, get) => ({
           op.id === id ? updatedOp : op
         ),
       }));
-    } catch (err: any) {
-      set({ error: err.message });
+    } catch (err: unknown) {
+      set({ error: getErrorMessage(err) });
       throw err;
     }
   },
@@ -77,8 +80,8 @@ export const useOperationStore = create<OperationStore>((set, get) => ({
     try {
       await OperationService.create(data);
       await get().fetchOperations();
-    } catch (err: any) {
-      set({ error: err.message });
+    } catch (err: unknown) {
+      set({ error: getErrorMessage(err) });
       throw err;
     }
   },
@@ -90,8 +93,8 @@ export const useOperationStore = create<OperationStore>((set, get) => ({
         operations: state.operations.filter((op) => op.id !== id),
         archivedOperations: state.archivedOperations.filter((op) => op.id !== id),
       }));
-    } catch (err: any) {
-      set({ error: err.message });
+    } catch (err: unknown) {
+      set({ error: getErrorMessage(err) });
       throw err;
     }
   },
@@ -103,8 +106,8 @@ export const useOperationStore = create<OperationStore>((set, get) => ({
         operations: state.operations.filter((op) => op.id !== id),
         archivedOperations: [...state.archivedOperations, updatedOp],
       }));
-    } catch (err: any) {
-      set({ error: err.message });
+    } catch (err: unknown) {
+      set({ error: getErrorMessage(err) });
       throw err;
     }
   },
@@ -116,8 +119,8 @@ export const useOperationStore = create<OperationStore>((set, get) => ({
         archivedOperations: state.archivedOperations.filter((op) => op.id !== id),
         operations: [...state.operations, updatedOp],
       }));
-    } catch (err: any) {
-      set({ error: err.message });
+    } catch (err: unknown) {
+      set({ error: getErrorMessage(err) });
       throw err;
     }
   },
@@ -130,8 +133,8 @@ export const useOperationStore = create<OperationStore>((set, get) => ({
           op.id === id ? updatedOp : op
         ),
       }));
-    } catch (err: any) {
-      set({ error: err.message });
+    } catch (err: unknown) {
+      set({ error: getErrorMessage(err) });
       throw err;
     }
   },

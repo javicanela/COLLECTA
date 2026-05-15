@@ -204,7 +204,8 @@ export const MoneyField: React.FC<MoneyFieldProps> = ({
   label,
   error,
   helperText,
-  currency = 'MXN',
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- prop reserved for future i18n, removed from spread to avoid DOM warning
+  currency: _currency = 'MXN',
   size,
   fullWidth,
   className,

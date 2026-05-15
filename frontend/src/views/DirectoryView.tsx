@@ -70,8 +70,8 @@ export default function DirectoryView() {
       setEditingClient(null);
       setEditFormData({});
       toast('ok', 'Cliente actualizado correctamente');
-    } catch (err: any) {
-      toast('err', err.message || 'Error al guardar los cambios');
+    } catch (err: unknown) {
+      toast('err', err instanceof Error ? err.message : 'Error al guardar los cambios');
     } finally {
       setIsSavingEdit(false);
     }

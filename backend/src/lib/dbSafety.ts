@@ -85,7 +85,7 @@ export function evaluateTestDbSafety(
   }
 
   const isAllowedLocalHost = ALLOWED_LOCAL_HOSTS.has(host);
-  const isMarkedTest = hasTestMarker(markerSource) || env.NODE_ENV === 'test';
+  const isMarkedTest = hasTestMarker(markerSource);
 
   if (!isAllowedLocalHost && !isMarkedTest) {
     return {
@@ -98,7 +98,7 @@ export function evaluateTestDbSafety(
 
   const reasonParts: string[] = [];
   if (isAllowedLocalHost) reasonParts.push(`host "${host}" is local`);
-  if (isMarkedTest) reasonParts.push('URL or NODE_ENV is marked as test');
+  if (isMarkedTest) reasonParts.push('URL is marked as test/local');
 
   return {
     safe: true,

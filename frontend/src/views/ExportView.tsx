@@ -2,16 +2,17 @@ import { useToast } from '../hooks/useToast';
 import ToastContainer from '../components/ui/ToastContainer';
 import Topbar from '../components/Topbar';
 import { FileSpreadsheet, FileText, Database, UploadCloud, Target, Users, Archive, History, AlertTriangle, Download, RefreshCw } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ExportService } from '../services/exportService';
 import { api } from '../services/api';
 import { pdf } from '@react-pdf/renderer';
 import ReporteCxCPDF from '../pdf-templates/ReporteCxCPDF';
+import type { Operation } from '../types';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 
-const StatCard = ({ icon: Icon, value, label, color }: { icon: any, value: number, label: string, color: string }) => (
+const StatCard = ({ icon: Icon, value, label, color }: { icon: React.ComponentType<{ size?: number }>, value: number, label: string, color: string }) => (
   <Card variant="glass" padding="normal" hoverable className="transition-transform hover:scale-[1.02]">
     <div className="flex items-center gap-4">
       <div className="p-3 rounded-xl" style={{ background: `${color}15`, color }}>
@@ -25,7 +26,19 @@ const StatCard = ({ icon: Icon, value, label, color }: { icon: any, value: numbe
   </Card>
 );
 
-const ExportBlock = ({ title, desc, action, btnClass, icon: Icon, iconColor, onClick, isLoading, badge }: any) => (
+interface ExportBlockProps {
+  title: string;
+  desc: string;
+  action: string;
+  btnClass: string;
+  icon: React.ComponentType<{ size?: number }>;
+  iconColor: string;
+  onClick: () => void;
+  isLoading: boolean;
+  badge?: string;
+}
+
+const ExportBlock = ({ title, desc, action, btnClass, icon: Icon, iconColor, onClick, isLoading, badge }: ExportBlockProps) => (
   <Card 
     variant="glass" 
     padding="normal" 
@@ -215,7 +228,7 @@ export default function ExportView() {
               btnClass="btn-orange" isLoading={loadingAction === 'pdf'}
               onClick={() => handleExport('pdf', async () => {
                 const [ops, cfg] = await Promise.all([
-                  api.get<any[]>('/operations'),
+                  api.get<Operation[]>('/operations'),
                   api.get<Record<string, string>>('/config'),
                 ]);
                 const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');

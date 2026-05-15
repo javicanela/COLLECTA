@@ -42,8 +42,10 @@ export default function MasivoWAModal({ isOpen, onClose, operations, config }: M
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const indexRef = useRef(0);
 
+  // Reset transient send state when the modal closes.
   useEffect(() => {
     if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- legacy reset-on-close pattern; behavior preserved
       setExcludedKeys(new Set());
       setStatus('idle');
       setCurrentIndex(0);
@@ -99,11 +101,11 @@ export default function MasivoWAModal({ isOpen, onClose, operations, config }: M
   }, [operations, excludedKeys, modo, config]);
 
 
-  const getTemplate = (tipo: PlantillaTipo) => {
+  const getTemplate = useCallback((tipo: PlantillaTipo) => {
     if (tipo === 'vencido') return config.plantilla_vencido || DEFAULT_MSG_VENCIDO;
     if (tipo === 'hoy') return config.plantilla_hoy || DEFAULT_MSG_HOY;
     return config.plantilla_recordatorio || DEFAULT_MSG_RECORDATORIO;
-  };
+  }, [config]);
 
   const getVariante = (group: CandidateGroup) => {
     const hasVencido = group.operations.some(o => (o.calculatedStatus || o.estatus) === 'VENCIDO');
@@ -172,7 +174,7 @@ export default function MasivoWAModal({ isOpen, onClose, operations, config }: M
           resultado: 'ERROR',
           mensaje: modo === 'PRUEBA' ? 'Teléfono de prueba no configurado' : 'Cliente sin teléfono',
           telefono: '',
-          modo: modo as any,
+          modo: modo as 'PRUEBA' | 'PRODUCCIÓN',
         });
       } catch { /* silencioso */ }
       return { clientName: client.nombre || '?', phone: '', total: 0, status: 'ERROR' as const, reason: 'Sin teléfono' };
@@ -189,12 +191,12 @@ export default function MasivoWAModal({ isOpen, onClose, operations, config }: M
         resultado: 'ENVIADO',
         mensaje: message.substring(0, 500),
         telefono: phone,
-        modo: modo as any,
+        modo: modo as 'PRUEBA' | 'PRODUCCIÓN',
       });
     } catch { /* log error silently */ }
 
     return { clientName: client.nombre || '?', phone, total, status: 'ENVIADO' as const };
-  }, [config, modo, plantillaSeleccionada]);
+  }, [config, modo, plantillaSeleccionada, getTemplate]);
 
   const startSending = () => {
     if (candidates.length === 0) return;
