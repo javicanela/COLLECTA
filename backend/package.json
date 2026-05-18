@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Collecta V5 Backend API",
   "main": "dist/index.js",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "set TS_NODE_FILES=true&& nodemon --exec \"node --max-old-space-size=4096 -r ts-node/register src/index.ts\"",
     "build": "tsc",

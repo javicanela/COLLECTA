@@ -11,6 +11,7 @@ export default defineConfig({
       'node_modules/**',
       'src/__tests__/clients.test.ts',
       'src/__tests__/collectionsE2E.*.test.ts',
+      'src/__tests__/multiTenantIsolation.test.ts',
       'src/__tests__/operations.test.ts',
       'src/__tests__/paymentConfirmationCorrelation.test.ts',
       'src/__tests__/phase8.smoke.test.ts',

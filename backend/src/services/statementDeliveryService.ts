@@ -1,5 +1,6 @@
 import type { Client } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { DEFAULT_ORGANIZATION_ID, organizationScopedRfc } from '../lib/tenant';
 import * as evolutionApi from './evolutionApi';
 import { isEmailConfigured, sendEmailWithAttachment } from './emailDelivery';
 import { generateClientStatementPdfBuffer } from './pdfStatementService';
@@ -57,6 +58,7 @@ function buildFallbackWaUrl(phone: string | null | undefined, client: Client, me
 }
 
 async function logDelivery(params: {
+  organizationId: string;
   clientId?: string | null;
   tipo: string;
   variante?: string | null;
@@ -66,6 +68,7 @@ async function logDelivery(params: {
 }) {
   await prisma.logEntry.create({
     data: {
+      organizationId: params.organizationId,
       clientId: params.clientId || null,
       tipo: params.tipo,
       variante: params.variante || null,
@@ -78,6 +81,7 @@ async function logDelivery(params: {
 }
 
 async function recordWhatsAppAttempt(params: {
+  organizationId: string;
   clientId: string;
   operationId?: string;
   phone: string;
@@ -89,6 +93,7 @@ async function recordWhatsAppAttempt(params: {
 }) {
   await prisma.whatsAppMessage.create({
     data: {
+      organizationId: params.organizationId,
       clientId: params.clientId,
       operationId: params.operationId || null,
       direction: 'OUTGOING',
@@ -102,6 +107,7 @@ async function recordWhatsAppAttempt(params: {
   });
 
   await logDelivery({
+    organizationId: params.organizationId,
     clientId: params.clientId,
     tipo: 'WHATSAPP',
     variante: 'STATEMENT_PDF',
@@ -112,13 +118,14 @@ async function recordWhatsAppAttempt(params: {
 }
 
 async function resolveClient(params: {
+  organizationId: string;
   clientId?: string;
   rfc?: string;
   operationId?: string;
 }): Promise<Client> {
   if (params.operationId) {
-    const operation = await prisma.operation.findUnique({
-      where: { id: params.operationId },
+    const operation = await prisma.operation.findFirst({
+      where: { id: params.operationId, organizationId: params.organizationId },
       include: { client: true },
     });
     if (!operation) {
@@ -131,7 +138,9 @@ async function resolveClient(params: {
   }
 
   if (params.clientId) {
-    const client = await prisma.client.findUnique({ where: { id: params.clientId } });
+    const client = await prisma.client.findFirst({
+      where: { id: params.clientId, organizationId: params.organizationId },
+    });
     if (!client) {
       throw new StatementDeliveryError('CLIENT_NOT_FOUND', 'Client not found', 404);
     }
@@ -139,7 +148,9 @@ async function resolveClient(params: {
   }
 
   if (params.rfc) {
-    const client = await prisma.client.findUnique({ where: { rfc: params.rfc.trim().toUpperCase() } });
+    const client = await prisma.client.findUnique({
+      where: organizationScopedRfc(params.organizationId, params.rfc.trim().toUpperCase()),
+    });
     if (!client) {
       throw new StatementDeliveryError('CLIENT_NOT_FOUND', 'Client not found', 404);
     }
@@ -150,17 +161,20 @@ async function resolveClient(params: {
 }
 
 export async function sendStatementToClient(params: {
+  organizationId?: string;
   clientId?: string;
   rfc?: string;
   channelPreference?: ChannelPreference;
   operationId?: string;
   requestedBy?: string;
 }): Promise<DeliveryResult> {
+  const organizationId = params.organizationId || DEFAULT_ORGANIZATION_ID;
   const channelPreference = params.channelPreference || 'AUTO';
-  const client = await resolveClient(params);
+  const client = await resolveClient({ ...params, organizationId });
 
   if (client.estado === 'SUSPENDIDO') {
     await logDelivery({
+      organizationId,
       clientId: client.id,
       tipo: 'STATEMENT_DELIVERY',
       variante: 'BLOCKED',
@@ -171,7 +185,7 @@ export async function sendStatementToClient(params: {
     throw new StatementDeliveryError('CLIENT_SUSPENDED', 'Client suspended', 409);
   }
 
-  const statement = await generateClientStatementPdfBuffer(client.rfc);
+  const statement = await generateClientStatementPdfBuffer(client.rfc, organizationId);
   const stored = await storeTemporaryPdf({
     buffer: statement.buffer,
     fileName: statement.fileName,
@@ -185,6 +199,7 @@ export async function sendStatementToClient(params: {
   if (wantsWhatsApp && client.telefono) {
     if (!evolutionApi.isConfigured()) {
       await recordWhatsAppAttempt({
+        organizationId,
         clientId: client.id,
         operationId: params.operationId,
         phone: client.telefono,
@@ -203,6 +218,7 @@ export async function sendStatementToClient(params: {
       );
 
       await recordWhatsAppAttempt({
+        organizationId,
         clientId: client.id,
         operationId: params.operationId,
         phone: client.telefono,
@@ -238,6 +254,7 @@ export async function sendStatementToClient(params: {
     });
 
     await logDelivery({
+      organizationId,
       clientId: client.id,
       tipo: 'EMAIL',
       variante: 'STATEMENT_PDF',
@@ -259,6 +276,7 @@ export async function sendStatementToClient(params: {
 
   const fallbackWaUrl = buildFallbackWaUrl(client.telefono, client, stored.url);
   await logDelivery({
+    organizationId,
     clientId: client.id,
     tipo: 'STATEMENT_DELIVERY',
     variante: 'MANUAL_FALLBACK',

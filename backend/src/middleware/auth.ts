@@ -21,7 +21,12 @@ function timingSafeEqual(a: string, b: string): boolean {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
-function localPrincipalFromJwt(decoded: { userId?: string; email?: string; role?: string }): AuthenticatedPrincipal | null {
+function localPrincipalFromJwt(decoded: {
+  userId?: string;
+  email?: string;
+  role?: string;
+  organizationId?: string;
+}): AuthenticatedPrincipal | null {
   if (!decoded.userId) return null;
 
   return {
@@ -29,6 +34,7 @@ function localPrincipalFromJwt(decoded: { userId?: string; email?: string; role?
     email: decoded.email,
     role: normalizePrincipalRole(decoded.role, 'viewer'),
     authSource: 'local',
+    organizationId: decoded.organizationId,
   };
 }
 
@@ -36,6 +42,7 @@ interface DecodedLocalJwt {
   userId?: string;
   email?: string;
   role?: string;
+  organizationId?: string;
   jti?: string;
 }
 

@@ -5,6 +5,7 @@ import { generateClientStatementPdfBuffer } from '../services/pdfStatementServic
 import { sendStatementToClient } from '../services/statementDeliveryService';
 
 type ClientRecord = {
+  organizationId: string;
   id: string;
   rfc: string;
   nombre: string;
@@ -14,6 +15,7 @@ type ClientRecord = {
 };
 
 type OperationRecord = {
+  organizationId: string;
   id: string;
   clientId: string;
   tipo: string;
@@ -61,18 +63,28 @@ vi.mock('../lib/prisma', () => ({
     client: {
       findUnique: vi.fn(async ({ where }: any) => {
         if (where.id) return db.clients.find(client => client.id === where.id) ?? null;
-        if (where.rfc) return db.clients.find(client => client.rfc === where.rfc) ?? null;
+        if (where.organizationId_rfc) {
+          return db.clients.find(client =>
+            client.organizationId === where.organizationId_rfc.organizationId &&
+            client.rfc === where.organizationId_rfc.rfc
+          ) ?? null;
+        }
         return null;
       }),
       findFirst: vi.fn(async ({ where }: any) => {
-        if (where.id) return db.clients.find(client => client.id === where.id) ?? null;
-        if (where.rfc) return db.clients.find(client => client.rfc === where.rfc) ?? null;
+        if (where.id) {
+          return db.clients.find(client =>
+            client.id === where.id &&
+            (!where.organizationId || client.organizationId === where.organizationId)
+          ) ?? null;
+        }
         return null;
       }),
     },
     operation: {
       findMany: vi.fn(async ({ where, orderBy }: any) => {
         let operations = db.operations.filter(operation => {
+          if (where?.organizationId && operation.organizationId !== where.organizationId) return false;
           if (where?.clientId && operation.clientId !== where.clientId) return false;
           if (where?.fechaPago === null && operation.fechaPago !== null) return false;
           if (where?.excluir === false && operation.excluir) return false;
@@ -96,9 +108,25 @@ vi.mock('../lib/prisma', () => ({
         }
         return operation;
       }),
+      findFirst: vi.fn(async ({ where, include }: any) => {
+        const operation = db.operations.find(item =>
+          item.id === where.id &&
+          (!where.organizationId || item.organizationId === where.organizationId)
+        );
+        if (!operation) return null;
+        if (include?.client) {
+          return {
+            ...operation,
+            client: db.clients.find(client => client.id === operation.clientId) ?? null,
+          };
+        }
+        return operation;
+      }),
     },
     config: {
-      findMany: vi.fn(async () => db.configs),
+      findMany: vi.fn(async ({ where }: any = {}) =>
+        db.configs.filter(config => !where?.organizationId || (config as any).organizationId === where.organizationId)
+      ),
     },
     whatsAppMessage: {
       create: vi.fn(async ({ data }: any) => {
@@ -120,6 +148,7 @@ vi.mock('../lib/prisma', () => ({
 function createClient(overrides: Partial<ClientRecord> = {}) {
   const client: ClientRecord = {
     id: `client-${db.clients.length + 1}`,
+    organizationId: 'default',
     rfc: 'XAXX010101000',
     nombre: 'Cliente Estado',
     telefono: '6641234567',
@@ -134,6 +163,7 @@ function createClient(overrides: Partial<ClientRecord> = {}) {
 function createOperation(clientId: string, overrides: Partial<OperationRecord> = {}) {
   const operation: OperationRecord = {
     id: `operation-${db.operations.length + 1}`,
+    organizationId: 'default',
     clientId,
     tipo: 'Honorarios',
     descripcion: 'Honorarios mensuales',
@@ -154,7 +184,7 @@ beforeEach(() => {
   db.operations = [];
   db.messages = [];
   db.logs = [];
-  db.configs = [{ key: 'nombre_despacho', value: 'Collecta' }];
+  db.configs = [{ organizationId: 'default', key: 'nombre_despacho', value: 'Collecta' } as any];
   vi.clearAllMocks();
   vi.mocked(evolutionApi.isConfigured).mockReturnValue(false);
   vi.mocked(evolutionApi.sendMediaMessage).mockResolvedValue({ success: true, messageId: 'wamid-statement-1' });

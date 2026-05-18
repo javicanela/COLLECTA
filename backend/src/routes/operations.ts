@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
+import { organizationScopedRfc, requireOrg } from '../lib/tenant';
 
 const router = Router();
 
@@ -40,9 +41,11 @@ function validateBody<T>(schema: z.ZodSchema<T>) {
 
 router.get('/', async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrg(req);
     const { archived, status, asesor } = req.query;
     const operations = await prisma.operation.findMany({
       where: {
+        organizationId,
         archived: archived === 'true',
         ...(status ? { estatus: status as string } : {}),
         ...(asesor ? { asesor: asesor as string } : {}),
@@ -82,12 +85,19 @@ router.get('/', async (req: Request, res: Response) => {
 
 router.post('/', validateBody(operationCreateSchema), async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrg(req);
     const { clientId, tipo, descripcion, monto, fechaVence, asesor } = req.body;
     const montoNum = monto ?? 0;
     const fechaVenceDate = new Date(fechaVence);
 
+    const client = await prisma.client.findFirst({
+      where: { id: clientId, organizationId },
+      select: { id: true },
+    });
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
     const operation = await prisma.operation.create({
-      data: { clientId, tipo, descripcion, monto: montoNum, fechaVence: fechaVenceDate, asesor },
+      data: { organizationId, clientId, tipo, descripcion, monto: montoNum, fechaVence: fechaVenceDate, asesor },
       include: { client: true }
     });
     res.status(201).json(operation);
@@ -98,11 +108,18 @@ router.post('/', validateBody(operationCreateSchema), async (req: Request, res: 
 
 router.put('/:id', validateBody(operationUpdateSchema), async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrg(req);
     const data: Record<string, unknown> = { ...req.body };
     if (data.fechaVence) data.fechaVence = new Date(data.fechaVence as string);
     if (data.fechaPago) data.fechaPago = new Date(data.fechaPago as string);
     
     delete data.id;
+
+    const existing = await prisma.operation.findFirst({
+      where: { id: req.params.id as string, organizationId },
+      select: { id: true },
+    });
+    if (!existing) return res.status(404).json({ error: 'Operation not found' });
     
     const operation = await prisma.operation.update({
       where: { id: req.params.id as string },
@@ -117,6 +134,12 @@ router.put('/:id', validateBody(operationUpdateSchema), async (req: Request, res
 
 router.patch('/:id/pay', async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrg(req);
+    const existing = await prisma.operation.findFirst({
+      where: { id: req.params.id as string, organizationId },
+      select: { id: true },
+    });
+    if (!existing) return res.status(404).json({ error: 'Operation not found' });
     const operation = await prisma.operation.update({
       where: { id: req.params.id as string },
       data: { fechaPago: new Date(), estatus: 'PAGADO' }
@@ -129,6 +152,12 @@ router.patch('/:id/pay', async (req: Request, res: Response) => {
 
 router.patch('/:id/unpay', async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrg(req);
+    const existing = await prisma.operation.findFirst({
+      where: { id: req.params.id as string, organizationId },
+      select: { id: true },
+    });
+    if (!existing) return res.status(404).json({ error: 'Operation not found' });
     const operation = await prisma.operation.update({
       where: { id: req.params.id as string },
       data: { fechaPago: null, estatus: 'PENDIENTE' },
@@ -142,6 +171,12 @@ router.patch('/:id/unpay', async (req: Request, res: Response) => {
 
 router.patch('/:id/archive', async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrg(req);
+    const existing = await prisma.operation.findFirst({
+      where: { id: req.params.id as string, organizationId },
+      select: { id: true },
+    });
+    if (!existing) return res.status(404).json({ error: 'Operation not found' });
     const operation = await prisma.operation.update({
       where: { id: req.params.id as string },
       data: { archived: true }
@@ -154,6 +189,12 @@ router.patch('/:id/archive', async (req: Request, res: Response) => {
 
 router.patch('/:id/unarchive', async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrg(req);
+    const existing = await prisma.operation.findFirst({
+      where: { id: req.params.id as string, organizationId },
+      select: { id: true },
+    });
+    if (!existing) return res.status(404).json({ error: 'Operation not found' });
     const operation = await prisma.operation.update({
       where: { id: req.params.id as string },
       data: { archived: false }
@@ -166,7 +207,10 @@ router.patch('/:id/unarchive', async (req: Request, res: Response) => {
 
 router.patch('/:id/toggle-exclude', async (req: Request, res: Response) => {
   try {
-    const op = await prisma.operation.findUnique({ where: { id: req.params.id as string } });
+    const organizationId = requireOrg(req);
+    const op = await prisma.operation.findFirst({
+      where: { id: req.params.id as string, organizationId },
+    });
     if (!op) return res.status(404).json({ error: 'Operation not found' });
     
     const updated = await prisma.operation.update({
@@ -181,7 +225,13 @@ router.patch('/:id/toggle-exclude', async (req: Request, res: Response) => {
 
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrg(req);
     console.log(`[DELETE] Attempting to delete operation: ${req.params.id}`);
+    const existing = await prisma.operation.findFirst({
+      where: { id: req.params.id as string, organizationId },
+      select: { id: true },
+    });
+    if (!existing) return res.status(404).json({ error: 'Operation not found' });
     await prisma.operation.delete({ where: { id: req.params.id as string } });
     console.log(`[DELETE] Successfully deleted operation: ${req.params.id}`);
     res.json({ message: 'Operation deleted' });
@@ -191,10 +241,11 @@ router.delete('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/stats/summary', async (_req: Request, res: Response) => {
+router.get('/stats/summary', async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrg(req);
     const today = new Date();
-    const all = await prisma.operation.findMany({ where: { archived: false } });
+    const all = await prisma.operation.findMany({ where: { organizationId, archived: false } });
     
     const stats = {
       total: all.length,
@@ -224,12 +275,13 @@ router.get('/stats/summary', async (_req: Request, res: Response) => {
 
 router.get('/cliente/:rfc/historial', async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrg(req);
     const rfcParam = req.params.rfc as string;
     const { meses } = req.query;
     const mesesNum = parseInt(meses as string) || 3;
     
     const client = await prisma.client.findUnique({
-      where: { rfc: rfcParam.toUpperCase() }
+      where: organizationScopedRfc(organizationId, rfcParam.toUpperCase())
     });
     if (!client) return res.status(404).json({ error: 'Client not found' });
     
@@ -238,6 +290,7 @@ router.get('/cliente/:rfc/historial', async (req: Request, res: Response) => {
     
     const operations = await prisma.operation.findMany({
       where: {
+        organizationId,
         clientId: client.id,
         fechaVence: { gte: fechaInicio }
       },

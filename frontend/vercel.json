@@ -1,13 +1,19 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://collecta-personal-token.up.railway.app/api/:path*" }
+    {
+      "source": "/api/:path*",
+      "destination": "https://YOUR_BACKEND_DOMAIN.example.com/api/:path*"
+    }
   ],
   "headers": [
     {
       "source": "/api/:path*",
       "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "https://collecta-azure.vercel.app" },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://YOUR_FRONTEND_DOMAIN.example.com"
+        },
         { "key": "Access-Control-Allow-Credentials", "value": "true" },
         { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,PATCH,DELETE,OPTIONS" },
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type,Authorization,X-Requested-With" }

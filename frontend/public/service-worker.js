@@ -1,10 +1,12 @@
-const CACHE_NAME = 'collecta-shell-v1';
+const CACHE_NAME = 'collecta-shell-v2';
 const APP_SHELL = [
   '/',
   '/index.html',
   '/offline.html',
   '/manifest.webmanifest',
   '/favicon.svg',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -28,6 +30,10 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
 
   if (request.method !== 'GET' || url.origin !== self.location.origin) {
+    return;
+  }
+
+  if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
     return;
   }
 

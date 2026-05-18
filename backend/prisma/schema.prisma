@@ -9,17 +9,40 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String?  @unique
-  role      String   @default("asesor")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String       @id @default(cuid())
+  organizationId String       @default("default")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  email          String?      @unique
+  role           String       @default("asesor")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+}
+
+model Organization {
+  id               String            @id @default(cuid())
+  nombre           String
+  slug             String            @unique
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  users            User[]
+  clients          Client[]
+  operations       Operation[]
+  logEntries       LogEntry[]
+  configs          Config[]
+  whatsAppMessages WhatsAppMessage[]
+  agentExecutions  AgentExecution[]
+  agentActions     AgentAction[]
+  agentConfigs     AgentConfig[]
 }
 
 model Client {
+  organizationId   String            @default("default")
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   id               String            @id @default(cuid())
-  rfc              String            @unique
+  rfc              String
   nombre           String
   telefono         String?
   email            String?
@@ -34,9 +57,14 @@ model Client {
   logEntries       LogEntry[]
   whatsAppMessages WhatsAppMessage[]
   agentActions     AgentAction[]
+
+  @@unique([organizationId, rfc])
+  @@index([organizationId])
 }
 
 model Operation {
+  organizationId   String            @default("default")
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   id               String            @id @default(cuid())
   clientId         String
   client           Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
@@ -52,27 +80,42 @@ model Operation {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   whatsAppMessages WhatsAppMessage[]
+
+  @@index([organizationId])
+  @@index([organizationId, clientId])
 }
 
 model LogEntry {
-  id           String   @id @default(cuid())
-  clientId     String?
-  client       Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  tipo         String
-  variante     String?
-  resultado    String
-  mensaje      String?
-  telefono     String?
-  modo         String   @default("PRUEBA")
-  createdAt    DateTime @default(now())
+  organizationId String       @default("default")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id             String       @id @default(cuid())
+  clientId       String?
+  client         Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  tipo           String
+  variante       String?
+  resultado      String
+  mensaje        String?
+  telefono       String?
+  modo           String       @default("PRUEBA")
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([organizationId, clientId])
 }
 
 model Config {
-  key   String @id
-  value String
+  organizationId String       @default("default")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  key            String
+  value          String
+
+  @@id([organizationId, key])
+  @@index([organizationId])
 }
 
 model WhatsAppMessage {
+  organizationId  String       @default("default")
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   id             String     @id @default(cuid())
   operationId    String?
   operation      Operation? @relation(fields: [operationId], references: [id], onDelete: SetNull)
@@ -86,11 +129,17 @@ model WhatsAppMessage {
   evolutionMsgId String?
   status         String     @default("SENT")
   createdAt      DateTime   @default(now())
+
+  @@index([organizationId])
+  @@index([organizationId, clientId])
+  @@index([organizationId, operationId])
 }
 
 // ─── Agente Autónomo ───────────────────────────────────────────
 
 model AgentExecution {
+  organizationId   String        @default("default")
+  organization     Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   id               String        @id @default(cuid())
   status           String        @default("PENDING")   // PENDING | RUNNING | PAUSED | COMPLETED | STOPPED | FAILED
   phase            String        @default("COLLECT")   // COLLECT | ANALYZE | EXECUTE | MONITOR
@@ -107,9 +156,13 @@ model AgentExecution {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   actions          AgentAction[]
+
+  @@index([organizationId])
 }
 
 model AgentAction {
+  organizationId String         @default("default")
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   id          String         @id @default(cuid())
   executionId String
   execution   AgentExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
@@ -124,9 +177,15 @@ model AgentAction {
   tenantId    String         @default("default")
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+
+  @@index([organizationId])
+  @@index([organizationId, clientId])
+  @@index([organizationId, executionId])
 }
 
 model AgentConfig {
+  organizationId   String       @default("default")
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   id              String   @id @default(cuid())
   tenantId        String   @default("default") @unique
   scheduleEnabled Boolean  @default(true)
@@ -137,4 +196,6 @@ model AgentConfig {
   notifyOnFail    Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([organizationId])
 }

@@ -1,5 +1,6 @@
 import type { Client, Operation } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { DEFAULT_ORGANIZATION_ID, organizationScopedRfc } from '../lib/tenant';
 import { createEstadoCuentaPdfBuffer, type EstadoCuentaData } from './pdfGenerator';
 
 export class StatementPdfError extends Error {
@@ -51,14 +52,19 @@ function toStatementData(
   };
 }
 
-export async function generateClientStatementPdfBuffer(clientRfc: string): Promise<{
+export async function generateClientStatementPdfBuffer(
+  clientRfc: string,
+  organizationId = DEFAULT_ORGANIZATION_ID,
+): Promise<{
   buffer: Buffer;
   fileName: string;
   client: Client;
   operations: Operation[];
 }> {
   const rfc = clientRfc.trim().toUpperCase();
-  const client = await prisma.client.findUnique({ where: { rfc } });
+  const client = await prisma.client.findUnique({
+    where: organizationScopedRfc(organizationId, rfc),
+  });
 
   if (!client) {
     throw new StatementPdfError('CLIENT_NOT_FOUND', 'Client not found', 404);
@@ -67,6 +73,7 @@ export async function generateClientStatementPdfBuffer(clientRfc: string): Promi
   const [operations, configRows] = await Promise.all([
     prisma.operation.findMany({
       where: {
+        organizationId,
         clientId: client.id,
         fechaPago: null,
         excluir: false,
@@ -75,7 +82,7 @@ export async function generateClientStatementPdfBuffer(clientRfc: string): Promi
       },
       orderBy: { fechaVence: 'asc' },
     }),
-    prisma.config.findMany(),
+    prisma.config.findMany({ where: { organizationId } }),
   ]);
 
   const data = toStatementData(client, operations, configRows);

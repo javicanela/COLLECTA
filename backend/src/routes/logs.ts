@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
+import { requireOrg } from '../lib/tenant';
 
 const router = Router();
 
@@ -27,9 +28,11 @@ function validateBody<T>(schema: z.ZodSchema<T>) {
   };
 }
 
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrg(req);
     const logs = await prisma.logEntry.findMany({
+      where: { organizationId },
       orderBy: { createdAt: 'desc' },
       include: {
         client: {
@@ -45,10 +48,19 @@ router.get('/', async (_req: Request, res: Response) => {
 
 router.post('/', validateBody(logCreateSchema), async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrg(req);
     const { clientId, tipo, variante, resultado, mensaje, telefono, modo } = req.body;
+    if (clientId) {
+      const client = await prisma.client.findFirst({
+        where: { id: clientId, organizationId },
+        select: { id: true },
+      });
+      if (!client) return res.status(404).json({ error: 'Client not found' });
+    }
     
     const log = await prisma.logEntry.create({
       data: {
+        organizationId,
         clientId: clientId || null,
         tipo,
         variante: variante || null,

@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { logger } from '../lib/logger';
 import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
+import { organizationScopedConfigKey, requireOrg } from '../lib/tenant';
 
 // Solo purge y restore son verdaderamente destructivos
 const destructiveLimiter = rateLimit({
@@ -57,9 +58,10 @@ function validateBody<T>(schema: z.ZodSchema<T>) {
   };
 }
 
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
-    const configs = await prisma.config.findMany();
+    const organizationId = requireOrg(req);
+    const configs = await prisma.config.findMany({ where: { organizationId } });
     const configObj: Record<string, string> = {};
     configs.forEach((c: any) => { configObj[c.key] = c.value; });
     res.json(configObj);
@@ -70,14 +72,15 @@ router.get('/', async (_req: Request, res: Response) => {
 
 router.put('/:key', validateBody(configPutSchema), async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrg(req);
     const { value } = req.body;
     if (req.params.key === 'clabe' && value && !validarCLABE(value)) {
       return res.status(400).json({ error: 'CLABE inválida: debe ser exactamente 18 dígitos numéricos' });
     }
     const config = await prisma.config.upsert({
-      where: { key: req.params.key as string },
+      where: organizationScopedConfigKey(organizationId, req.params.key as string),
       update: { value },
-      create: { key: req.params.key as string, value }
+      create: { organizationId, key: req.params.key as string, value }
     });
     res.json(config);
   } catch (error) {
@@ -87,13 +90,18 @@ router.put('/:key', validateBody(configPutSchema), async (req: Request, res: Res
 
 router.post('/bulk', validateBody(configBulkSchema), async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrg(req);
     const entries = req.body;
     const clabeEntry = entries.find((e: {key: string; value: string}) => e.key === 'clabe');
     if (clabeEntry && clabeEntry.value && !validarCLABE(clabeEntry.value)) {
       return res.status(400).json({ error: 'CLABE inválida: debe ser exactamente 18 dígitos numéricos' });
     }
     const promises = entries.map((e: {key: string; value: string}) =>
-      prisma.config.upsert({ where: { key: e.key }, update: { value: e.value }, create: { key: e.key, value: e.value } })
+      prisma.config.upsert({
+        where: organizationScopedConfigKey(organizationId, e.key),
+        update: { value: e.value },
+        create: { organizationId, key: e.key, value: e.value }
+      })
     );
     await Promise.all(promises);
     res.json({ message: 'Config saved', count: entries.length });
@@ -102,11 +110,12 @@ router.post('/bulk', validateBody(configBulkSchema), async (req: Request, res: R
   }
 });
 
-router.get('/stats', async (_req: Request, res: Response) => {
+router.get('/stats', async (req: Request, res: Response) => {
   try {
-    const clientsCount = await prisma.client.count();
-    const operationsCount = await prisma.operation.count();
-    const logsCount = await prisma.logEntry.count();
+    const organizationId = requireOrg(req);
+    const clientsCount = await prisma.client.count({ where: { organizationId } });
+    const operationsCount = await prisma.operation.count({ where: { organizationId } });
+    const logsCount = await prisma.logEntry.count({ where: { organizationId } });
     
     res.json({
       clients: clientsCount,
@@ -118,12 +127,13 @@ router.get('/stats', async (_req: Request, res: Response) => {
   }
 });
 
-router.get('/backup', async (_req: Request, res: Response) => {
+router.get('/backup', async (req: Request, res: Response) => {
   try {
-    const clients = await prisma.client.findMany();
-    const operations = await prisma.operation.findMany();
-    const logs = await prisma.logEntry.findMany();
-    const config = await prisma.config.findMany();
+    const organizationId = requireOrg(req);
+    const clients = await prisma.client.findMany({ where: { organizationId } });
+    const operations = await prisma.operation.findMany({ where: { organizationId } });
+    const logs = await prisma.logEntry.findMany({ where: { organizationId } });
+    const config = await prisma.config.findMany({ where: { organizationId } });
     
     res.json({
       timestamp: new Date().toISOString(),
@@ -137,25 +147,34 @@ router.get('/backup', async (_req: Request, res: Response) => {
 
 router.post('/restore', destructiveLimiter, validateBody(restoreSchema), async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrg(req);
     const { clients, operations, logs, config } = req.body.data;
     
     await prisma.$transaction(async (tx) => {
-      await tx.logEntry.deleteMany();
-      await tx.operation.deleteMany();
-      await tx.client.deleteMany();
-      await tx.config.deleteMany();
+      await tx.logEntry.deleteMany({ where: { organizationId } });
+      await tx.operation.deleteMany({ where: { organizationId } });
+      await tx.client.deleteMany({ where: { organizationId } });
+      await tx.config.deleteMany({ where: { organizationId } });
       
       if (config && config.length > 0) {
-        await tx.config.createMany({ data: config });
+        await tx.config.createMany({
+          data: config.map((row: any) => ({ ...row, organizationId })),
+        });
       }
       if (clients && clients.length > 0) {
-        await tx.client.createMany({ data: clients });
+        await tx.client.createMany({
+          data: clients.map((row: any) => ({ ...row, organizationId })),
+        });
       }
       if (operations && operations.length > 0) {
-        await tx.operation.createMany({ data: operations });
+        await tx.operation.createMany({
+          data: operations.map((row: any) => ({ ...row, organizationId })),
+        });
       }
       if (logs && logs.length > 0) {
-        await tx.logEntry.createMany({ data: logs });
+        await tx.logEntry.createMany({
+          data: logs.map((row: any) => ({ ...row, organizationId })),
+        });
       }
     });
 
@@ -168,16 +187,17 @@ router.post('/restore', destructiveLimiter, validateBody(restoreSchema), async (
 
 router.post('/purge', destructiveLimiter, validateBody(purgeSchema), async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrg(req);
     const { type } = req.body;
     
     if (type === 'all') {
-      await prisma.logEntry.deleteMany();
-      await prisma.operation.deleteMany();
-      await prisma.client.deleteMany();
+      await prisma.logEntry.deleteMany({ where: { organizationId } });
+      await prisma.operation.deleteMany({ where: { organizationId } });
+      await prisma.client.deleteMany({ where: { organizationId } });
     } else if (type === 'logs') {
-      await prisma.logEntry.deleteMany();
+      await prisma.logEntry.deleteMany({ where: { organizationId } });
     } else if (type === 'staging') {
-      await prisma.operation.deleteMany({ where: { estatus: 'PENDIENTE' }});
+      await prisma.operation.deleteMany({ where: { organizationId, estatus: 'PENDIENTE' }});
     }
 
     res.json({ message: `Purged ${type} successfully` });

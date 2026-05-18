@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { req, TEST_AUTH, prisma } from './test-app';
+import { organizationScopedRfc } from '../lib/tenant';
 
 let rfcCounter = 0;
 const uniqueRfc = () => {
@@ -88,7 +89,7 @@ describe('Phase 8 backend smoke checks', () => {
       operacionesCreadas: 1,
     });
 
-    const client = await prisma.client.findUnique({ where: { rfc } });
+    const client = await prisma.client.findUnique({ where: organizationScopedRfc('default', rfc) });
     expect(client?.nombre).toBe('Cliente Import Smoke');
   });
 

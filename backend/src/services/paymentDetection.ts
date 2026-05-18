@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
+import { DEFAULT_ORGANIZATION_ID, organizationScopedRfc } from '../lib/tenant';
 
 export const PAYMENT_DETECTION_LOG_TYPE = 'PAYMENT_DETECTION';
 
@@ -116,6 +117,7 @@ function parseAmountFromText(rawText: string): number | null {
 
 async function writeDetectionLog(
   prisma: PrismaClient,
+  organizationId: string,
   clientId: string | null,
   resultado: DetectionStatus,
   reasons: string[],
@@ -131,6 +133,7 @@ async function writeDetectionLog(
 
   await prisma.logEntry.create({
     data: {
+      organizationId,
       clientId,
       tipo: PAYMENT_DETECTION_LOG_TYPE,
       variante: evidence.source || 'manual',
@@ -144,6 +147,7 @@ async function writeDetectionLog(
 async function writeIncomingCorrelationLog(
   prisma: PrismaClient,
   params: {
+    organizationId: string;
     clientId?: string | null;
     phone: string;
     resultado: DetectionStatus;
@@ -169,6 +173,7 @@ async function writeIncomingCorrelationLog(
 
   await prisma.logEntry.create({
     data: {
+      organizationId: params.organizationId,
       clientId: params.clientId || null,
       tipo: PAYMENT_DETECTION_LOG_TYPE,
       variante: 'WHATSAPP_REPLY',
@@ -183,6 +188,7 @@ async function writeIncomingCorrelationLog(
 export async function detectPaymentFromEvidence(
   prisma: PrismaClient,
   evidence: PaymentEvidence,
+  organizationId = DEFAULT_ORGANIZATION_ID,
 ): Promise<DetectionResult> {
   const normalizedRfc = evidence.rfc.toUpperCase();
   const normalizedEvidence = { ...evidence, rfc: normalizedRfc };
@@ -190,6 +196,7 @@ export async function detectPaymentFromEvidence(
 
   const previousAccepted = await prisma.logEntry.findFirst({
     where: {
+      organizationId,
       tipo: PAYMENT_DETECTION_LOG_TYPE,
       resultado: 'ACCEPTED',
       mensaje: { contains: `fingerprint=${idempotencyKey}` },
@@ -201,6 +208,7 @@ export async function detectPaymentFromEvidence(
     const previousOperationId = previousAccepted.mensaje?.match(/operationId=([^|\s]+)/)?.[1];
     await writeDetectionLog(
       prisma,
+      organizationId,
       previousAccepted.clientId,
       'DUPLICATE',
       ['duplicate_receipt'],
@@ -216,11 +224,11 @@ export async function detectPaymentFromEvidence(
   }
 
   const client = await prisma.client.findUnique({
-    where: { rfc: normalizedRfc },
+    where: organizationScopedRfc(organizationId, normalizedRfc),
   });
 
   if (!client) {
-    await writeDetectionLog(prisma, null, 'REVIEW_REQUIRED', ['client_not_found'], normalizedEvidence);
+    await writeDetectionLog(prisma, organizationId, null, 'REVIEW_REQUIRED', ['client_not_found'], normalizedEvidence);
     return {
       status: 'REVIEW_REQUIRED',
       reasons: ['client_not_found'],
@@ -230,6 +238,7 @@ export async function detectPaymentFromEvidence(
 
   const pendingOps = await prisma.operation.findMany({
     where: {
+      organizationId,
       clientId: client.id,
       fechaPago: null,
       estatus: { not: 'PAGADO' },
@@ -244,6 +253,7 @@ export async function detectPaymentFromEvidence(
   if (!matchedOp) {
     await writeDetectionLog(
       prisma,
+      organizationId,
       client.id,
       'REVIEW_REQUIRED',
       ['no_safe_operation_match'],
@@ -270,6 +280,7 @@ export async function detectPaymentFromEvidence(
 
   await writeDetectionLog(
     prisma,
+    organizationId,
     client.id,
     'ACCEPTED',
     reasons,
@@ -291,8 +302,10 @@ export async function correlateIncomingWhatsAppPaymentConfirmation(
     phone: string;
     text?: string | null;
     sourceMessageId?: string | null;
+    organizationId?: string;
   },
 ): Promise<DetectionResult> {
+  const organizationId = input.organizationId || DEFAULT_ORGANIZATION_ID;
   const normalizedText = normalizeMessageText(input.text);
   const phoneLast10 = last10Digits(input.phone);
   const amount = parseAmountFromText(input.text || '');
@@ -302,6 +315,7 @@ export async function correlateIncomingWhatsAppPaymentConfirmation(
 
   const previousAccepted = await prisma.logEntry.findFirst({
     where: {
+      organizationId,
       tipo: PAYMENT_DETECTION_LOG_TYPE,
       resultado: 'ACCEPTED',
       mensaje: { contains: duplicateNeedle },
@@ -314,6 +328,7 @@ export async function correlateIncomingWhatsAppPaymentConfirmation(
     const reasons = ['duplicate_incoming_message'];
     await writeIncomingCorrelationLog(prisma, {
       clientId: previousAccepted.clientId,
+      organizationId,
       phone: input.phone,
       resultado: 'DUPLICATE',
       reasons,
@@ -334,6 +349,7 @@ export async function correlateIncomingWhatsAppPaymentConfirmation(
   const client = phoneLast10
     ? await prisma.client.findFirst({
       where: {
+        organizationId,
         telefono: { contains: phoneLast10 },
       },
     })
@@ -343,6 +359,7 @@ export async function correlateIncomingWhatsAppPaymentConfirmation(
     const reasons = ['client_not_found'];
     await writeIncomingCorrelationLog(prisma, {
       phone: input.phone,
+      organizationId,
       resultado: 'REVIEW_REQUIRED',
       reasons,
       confidence: 0,
@@ -355,6 +372,7 @@ export async function correlateIncomingWhatsAppPaymentConfirmation(
 
   const baseLog = {
     clientId: client.id,
+    organizationId,
     phone: input.phone,
     amount,
     sourceMessageId: input.sourceMessageId,
@@ -380,6 +398,7 @@ export async function correlateIncomingWhatsAppPaymentConfirmation(
   const previousOutbound = await prisma.whatsAppMessage.findFirst({
     where: {
       clientId: client.id,
+      organizationId,
       direction: 'OUTGOING',
       phone: { contains: phoneLast10 },
       createdAt: { gte: cutoff },
@@ -401,6 +420,7 @@ export async function correlateIncomingWhatsAppPaymentConfirmation(
   const openOperations = await prisma.operation.findMany({
     where: {
       clientId: client.id,
+      organizationId,
       fechaPago: null,
       estatus: { not: 'PAGADO' },
       excluir: false,

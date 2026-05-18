@@ -32,7 +32,14 @@ function createInMemoryPrisma() {
         return client;
       },
       findUnique: async ({ where }: any) =>
-        clients.find(client => client.rfc === where.rfc || client.id === where.id) || null,
+        clients.find(client => {
+          if (where.id) return client.id === where.id;
+          if (where.organizationId_rfc) {
+            return client.organizationId === where.organizationId_rfc.organizationId
+              && client.rfc === where.organizationId_rfc.rfc;
+          }
+          return false;
+        }) || null,
     },
     operation: {
       create: async ({ data }: any) => {
@@ -53,6 +60,7 @@ function createInMemoryPrisma() {
       },
       findMany: async ({ where, orderBy }: any = {}) => {
         let result = [...operations];
+        if (where?.organizationId) result = result.filter(op => op.organizationId === where.organizationId);
         if (where?.clientId) result = result.filter(op => op.clientId === where.clientId);
         if (where?.fechaPago === null) result = result.filter(op => op.fechaPago === null);
         if (where?.excluir !== undefined) result = result.filter(op => op.excluir === where.excluir);
@@ -84,6 +92,7 @@ function createInMemoryPrisma() {
         const log = {
           id: nextId('log'),
           createdAt: new Date(Date.UTC(2026, 4, logs.length + 1)),
+          organizationId: 'default',
           ...data,
         };
         logs.push(log);
@@ -103,11 +112,12 @@ function createInMemoryPrisma() {
       findFirst: async ({ where, orderBy }: any = {}) => {
         let result = logs.filter(log => {
           const typeOk = where?.tipo ? log.tipo === where.tipo : true;
+          const orgOk = where?.organizationId ? log.organizationId === where.organizationId : true;
           const resultOk = where?.resultado ? log.resultado === where.resultado : true;
           const containsOk = where?.mensaje?.contains
             ? String(log.mensaje || '').includes(where.mensaje.contains)
             : true;
-          return typeOk && resultOk && containsOk;
+          return orgOk && typeOk && resultOk && containsOk;
         });
         if (orderBy?.createdAt === 'desc') {
           result = result.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -129,6 +139,7 @@ async function createPendingOperation(prisma: any, options: {
   const client = await prisma.client.create({
     data: {
       rfc: options.rfc ?? uniqueRfc(),
+      organizationId: 'default',
       nombre: 'Cliente Pago Detectado',
       telefono: '6641234567',
     },
@@ -137,6 +148,7 @@ async function createPendingOperation(prisma: any, options: {
   const operation = await prisma.operation.create({
     data: {
       clientId: client.id,
+      organizationId: client.organizationId,
       tipo: 'FISCAL',
       descripcion: 'Servicio contable mensual',
       monto: options.amount ?? 2100,

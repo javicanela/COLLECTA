@@ -6,6 +6,7 @@ export interface AuthenticatedPrincipal {
   email?: string;
   role: PrincipalRole;
   authSource: AuthSource;
+  organizationId?: string;
 }
 
 const principalRoles: PrincipalRole[] = ['admin', 'asesor', 'viewer', 'service'];

@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import PDFDocument from 'pdfkit';
+import { DEFAULT_ORGANIZATION_ID, organizationScopedRfc } from '../lib/tenant';
 
 export interface EstadoCuentaData {
   cliente: {
@@ -26,8 +27,13 @@ export interface EstadoCuentaData {
   config: Record<string, string>;
 }
 
-export async function generateEstadoCuenta(rfc: string): Promise<EstadoCuentaData> {
-  const client = await prisma.client.findUnique({ where: { rfc: rfc.toUpperCase() } });
+export async function generateEstadoCuenta(
+  rfc: string,
+  organizationId = DEFAULT_ORGANIZATION_ID,
+): Promise<EstadoCuentaData> {
+  const client = await prisma.client.findUnique({
+    where: organizationScopedRfc(organizationId, rfc.toUpperCase()),
+  });
   if (!client) throw new Error('Client not found');
 
   const tresMesesAtras = new Date();
@@ -35,13 +41,14 @@ export async function generateEstadoCuenta(rfc: string): Promise<EstadoCuentaDat
 
   const operations = await prisma.operation.findMany({
     where: {
+      organizationId,
       clientId: client.id,
       fechaVence: { gte: tresMesesAtras }
     },
     orderBy: { fechaVence: 'desc' }
   });
 
-  const configRows = await prisma.config.findMany();
+  const configRows = await prisma.config.findMany({ where: { organizationId } });
   const cfg: Record<string, string> = {};
   configRows.forEach(c => cfg[c.key] = c.value);
 

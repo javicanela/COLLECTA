@@ -1,6 +1,7 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
+import { organizationScopedRfc, requireOrg } from '../lib/tenant';
 
 const router = Router();
 
@@ -44,12 +45,12 @@ function validateBody<T>(schema: z.ZodSchema<T>) {
   };
 }
 
-import { NextFunction } from 'express';
-
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrg(req);
     const clients = await prisma.client.findMany({
-      include: { operations: true },
+      where: { organizationId },
+      include: { operations: { where: { organizationId } } },
       orderBy: { nombre: 'asc' }
     });
     res.json(clients);
@@ -58,11 +59,31 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 });
 
+router.get('/by-rfc/:rfc', async (req: Request, res: Response) => {
+  try {
+    const organizationId = requireOrg(req);
+    const rfcParam = req.params.rfc as string;
+    const rfcUpper = rfcParam.toUpperCase();
+    const client = await prisma.client.findUnique({
+      where: organizationScopedRfc(organizationId, rfcUpper),
+      include: { operations: { where: { organizationId } } }
+    });
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    res.json(client);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching client by RFC' });
+  }
+});
+
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const client = await prisma.client.findUnique({
-      where: { id: req.params.id as string },
-      include: { operations: true, logEntries: true }
+    const organizationId = requireOrg(req);
+    const client = await prisma.client.findFirst({
+      where: { id: req.params.id as string, organizationId },
+      include: {
+        operations: { where: { organizationId } },
+        logEntries: { where: { organizationId } },
+      }
     });
     if (!client) return res.status(404).json({ error: 'Client not found' });
     res.json(client);
@@ -73,11 +94,12 @@ router.get('/:id', async (req: Request, res: Response) => {
 
 router.post('/', validateBody(clientCreateSchema), async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrg(req);
     const { rfc, nombre, telefono, email, regimen, categoria, asesor, notas } = req.body;
     const rfcUpper = rfc.toUpperCase();
 
     const client = await prisma.client.create({
-      data: { rfc: rfcUpper, nombre, telefono, email, regimen, categoria, asesor, notas }
+      data: { organizationId, rfc: rfcUpper, nombre, telefono, email, regimen, categoria, asesor, notas }
     });
     res.status(201).json(client);
   } catch (error: any) {
@@ -88,9 +110,15 @@ router.post('/', validateBody(clientCreateSchema), async (req: Request, res: Res
 
 router.put('/:id', validateBody(clientUpdateSchema), async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrg(req);
     const { nombre, telefono, email, regimen, categoria, asesor, notas, estado } = req.body;
     const updateData: Record<string, unknown> = { nombre, telefono, email, regimen, categoria, asesor, notas, estado };
     Object.keys(updateData).forEach(k => updateData[k] === undefined && delete updateData[k]);
+    const existing = await prisma.client.findFirst({
+      where: { id: req.params.id as string, organizationId },
+      select: { id: true },
+    });
+    if (!existing) return res.status(404).json({ error: 'Client not found' });
     const client = await prisma.client.update({
       where: { id: req.params.id as string },
       data: updateData
@@ -104,16 +132,17 @@ router.put('/:id', validateBody(clientUpdateSchema), async (req: Request, res: R
 
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
+    const organizationId = requireOrg(req);
     const clientId = req.params.id as string;
     console.log(`[DELETE CLIENT] Attempting to delete client: ${clientId}`);
     
-    const client = await prisma.client.findUnique({ where: { id: clientId } });
+    const client = await prisma.client.findFirst({ where: { id: clientId, organizationId } });
     if (!client) {
       console.log(`[DELETE CLIENT] Client not found: ${clientId}`);
       return res.status(404).json({ error: 'Client not found' });
     }
     
-    const opCount = await prisma.operation.count({ where: { clientId } });
+    const opCount = await prisma.operation.count({ where: { clientId, organizationId } });
     console.log(`[DELETE CLIENT] Client "${client.nombre}" has ${opCount} operations`);
     
     await prisma.client.delete({ where: { id: clientId } });
@@ -131,7 +160,10 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
 router.patch('/:id/toggle-status', async (req: Request, res: Response) => {
   try {
-    const client = await prisma.client.findUnique({ where: { id: req.params.id as string } });
+    const organizationId = requireOrg(req);
+    const client = await prisma.client.findFirst({
+      where: { id: req.params.id as string, organizationId },
+    });
     if (!client) return res.status(404).json({ error: 'Client not found' });
     
     const updated = await prisma.client.update({
@@ -141,21 +173,6 @@ router.patch('/:id/toggle-status', async (req: Request, res: Response) => {
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: 'Error toggling status' });
-  }
-});
-
-router.get('/by-rfc/:rfc', async (req: Request, res: Response) => {
-  try {
-    const rfcParam = req.params.rfc as string;
-    const rfcUpper = rfcParam.toUpperCase();
-    const client = await prisma.client.findUnique({
-      where: { rfc: rfcUpper },
-      include: { operations: true }
-    });
-    if (!client) return res.status(404).json({ error: 'Client not found' });
-    res.json(client);
-  } catch (error) {
-    res.status(500).json({ error: 'Error fetching client by RFC' });
   }
 });
 

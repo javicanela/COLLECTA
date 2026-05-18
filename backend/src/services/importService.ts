@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { DEFAULT_ORGANIZATION_ID, organizationScopedRfc } from '../lib/tenant';
 
 export interface ImportRow {
   rfc: string;
@@ -20,7 +21,10 @@ export interface ImportResult {
 
 const RFC_REGEX = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{2,3}$/;
 
-export async function processImportBatch(rows: ImportRow[]): Promise<ImportResult> {
+export async function processImportBatch(
+  rows: ImportRow[],
+  organizationId = DEFAULT_ORGANIZATION_ID,
+): Promise<ImportResult> {
   const result: ImportResult = {
     clientesCreados: 0,
     clientesActualizados: 0,
@@ -38,11 +42,14 @@ export async function processImportBatch(rows: ImportRow[]): Promise<ImportResul
       }
 
       const rfcUpper = row.rfc.toUpperCase();
-      let client = await prisma.client.findUnique({ where: { rfc: rfcUpper } });
+      let client = await prisma.client.findUnique({
+        where: organizationScopedRfc(organizationId, rfcUpper),
+      });
 
       if (!client) {
         client = await prisma.client.create({
           data: {
+            organizationId,
             rfc: rfcUpper,
             nombre: row.nombre || rfcUpper,
             telefono: row.telefono,
@@ -68,6 +75,7 @@ export async function processImportBatch(rows: ImportRow[]): Promise<ImportResul
 
       const existingOp = await prisma.operation.findFirst({
         where: {
+          organizationId,
           clientId: client.id,
           tipo: row.concepto,
           monto: row.monto
@@ -81,6 +89,7 @@ export async function processImportBatch(rows: ImportRow[]): Promise<ImportResul
 
       await prisma.operation.create({
         data: {
+          organizationId,
           clientId: client.id,
           tipo: row.concepto,
           descripcion: row.concepto,

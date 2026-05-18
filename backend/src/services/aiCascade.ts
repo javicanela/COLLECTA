@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import prisma from '../lib/prisma';
 import { logger } from '../lib/logger';
+import { DEFAULT_ORGANIZATION_ID, organizationScopedConfigKey } from '../lib/tenant';
 
 // Load SINONIMOS from the data folder
 const SINONIMOS_PATH = path.join(__dirname, '..', '..', '..', 'data', 'SINONIMOS_COLUMNAS.json');
@@ -20,24 +21,18 @@ interface AiResult {
   _source: string;
 }
 
-/** Read an API key from Config table first; fallback to process.env */
-async function getApiKey(configKey: string, envKey: string): Promise<string | null> {
-  try {
-    const row = await prisma.config.findUnique({ where: { key: configKey } });
-    if (row?.value && row.value.trim().length > 0) return row.value.trim();
-  } catch {
-    // silently ignore DB errors — fallback to env
-  }
+/** Read API keys only from environment; never from tenant Config. */
+async function getApiKey(_configKey: string, envKey: string): Promise<string | null> {
   return process.env[envKey] || null;
 }
 
 /** Save last provider used to Config table */
-async function saveLastProvider(provider: string): Promise<void> {
+async function saveLastProvider(provider: string, organizationId = DEFAULT_ORGANIZATION_ID): Promise<void> {
   try {
     await prisma.config.upsert({
-      where: { key: 'ai_last_provider' },
+      where: organizationScopedConfigKey(organizationId, 'ai_last_provider'),
       update: { value: provider },
-      create: { key: 'ai_last_provider', value: provider },
+      create: { organizationId, key: 'ai_last_provider', value: provider },
     });
   } catch {
     // non-critical
@@ -189,7 +184,12 @@ export function regexFallback(headers: string[], dataRows: string[][]): AiResult
   };
 }
 
-export async function aiCascade(headers: string[], rows: string[][], provider: string = 'auto'): Promise<AiResult> {
+export async function aiCascade(
+  headers: string[],
+  rows: string[][],
+  provider: string = 'auto',
+  organizationId = DEFAULT_ORGANIZATION_ID,
+): Promise<AiResult> {
   const prompt = `Analiza estas columnas de un archivo de datos fiscales mexicano y mapea cada indice de columna al campo correspondiente.
 Columnas: ${JSON.stringify(headers)}
 Primeras filas de datos: ${JSON.stringify(rows.slice(0, 5))}
@@ -218,7 +218,7 @@ Responde SOLO con JSON asi:
   }
 
   // Persist which provider was used
-  await saveLastProvider(result._source);
+  await saveLastProvider(result._source, organizationId);
 
   return result;
 }

@@ -1,4 +1,5 @@
 import express from 'express';
+import * as jwt from 'jsonwebtoken';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -54,6 +55,32 @@ describe('auth middleware principal contract', () => {
       userId: 'api-key',
       role: 'service',
       authSource: 'api_key',
+    });
+  });
+
+  it('maps local JWT organizationId into the authenticated principal', async () => {
+    const token = jwt.sign(
+      {
+        userId: 'user-despacho-a',
+        email: 'admin@despacho-a.test',
+        role: 'admin',
+        organizationId: 'org-despacho-a',
+      },
+      process.env.JWT_SECRET as string,
+      { expiresIn: '1h' },
+    );
+
+    const res = await createProtectedApp()
+      .get('/protected')
+      .set({ Authorization: `Bearer ${token}` });
+
+    expect(res.status).toBe(200);
+    expect(res.body.user).toMatchObject({
+      userId: 'user-despacho-a',
+      email: 'admin@despacho-a.test',
+      role: 'admin',
+      authSource: 'local',
+      organizationId: 'org-despacho-a',
     });
   });
 

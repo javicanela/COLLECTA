@@ -32,9 +32,15 @@ beforeEach(async () => {
     return;
   }
   await prisma.operation.deleteMany();
+  await prisma.whatsAppMessage.deleteMany();
   await prisma.client.deleteMany();
   await prisma.config.deleteMany();
   await prisma.logEntry.deleteMany();
+  await prisma.organization.upsert({
+    where: { id: 'default' },
+    update: {},
+    create: { id: 'default', nombre: 'Default', slug: 'default' },
+  });
 });
 
 afterAll(async () => {
