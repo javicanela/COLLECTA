@@ -1,27 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300..900&family=Outfit:wght@300..900&family=JetBrains+Mono:wght@400..700&display=swap');
 @import "tailwindcss";
 
 /* ── FONTS ─────────────────────────────────────────────────────────────────── */
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 300 900;
-  font-display: swap;
-  src: url(https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2) format('woff2');
-}
-@font-face {
-  font-family: 'JetBrains Mono';
-  font-style: normal;
-  font-weight: 400 600;
-  font-display: swap;
-  src: url(https://fonts.gstatic.com/s/jetbrainsmono/v18/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxjPVmUsaaDhw.woff2) format('woff2');
-}
-@font-face {
-  font-family: 'Outfit';
-  font-style: normal;
-  font-weight: 300 900;
-  font-display: swap;
-  src: url(https://fonts.gstatic.com/s/outfit/v11/QGYyz_MVcBeNP4NjuGObqx1XmO1I4TC1C4G-EiAou6Y.woff2) format('woff2');
-}
 
 /* ── BRAND PRIMITIVES (never change between themes) ──────────────────────── */
 :root {
@@ -132,13 +112,13 @@
   --c-bg:              #0C0E1A;
   --c-bg-gradient:     radial-gradient(ellipse 70% 45% at 85% 0%, rgba(59,79,232,0.22), transparent),
                        radial-gradient(ellipse 50% 35% at 5% 95%, rgba(124,58,237,0.14), transparent);
-  --c-surface:         #141728;
-  --c-surface-raised:  #1C2038;
-  --c-surface-glass:   rgba(20,23,40,0.80);
-  --c-border:          rgba(255,255,255,0.10);
-  --c-border-subtle:   rgba(255,255,255,0.05);
-  --c-text:            #F1F5F9;
-  --c-text-2:          #94A3B8;
+  --c-surface:         #161A2E;
+  --c-surface-raised:  #1F2440;
+  --c-surface-glass:   rgba(22,26,46,0.85);
+  --c-border:          rgba(255,255,255,0.14);
+  --c-border-subtle:   rgba(255,255,255,0.08);
+  --c-text:            #F8FAFC;
+  --c-text-2:          #CBD5E1;
   --c-text-muted:      #64748B;
   --c-overlay:         rgba(0,0,0,0.72);
   --c-shadow-sm:       0 1px 3px rgba(0,0,0,0.25);
@@ -163,9 +143,17 @@
   --legacy-gold-dim:   rgba(217,119,6,0.15);
   --border:            rgba(255,255,255,0.10);
   --border2:           rgba(255,255,255,0.18);
-  --text:              #F1F5F9;
-  --text2:             #94A3B8;
+  --text:              #F8FAFC;
+  --text2:             #CBD5E1;
 }
+
+[data-theme="dark"] .text-\[var\(--brand-success\)\] { color: #34D399; }
+[data-theme="dark"] .text-\[var\(--brand-danger\)\] { color: #F87171; }
+[data-theme="dark"] .text-\[var\(--brand-warn-dark\)\] { color: #FBBF24; }
+[data-theme="dark"] .text-\[var\(--brand-info\)\] { color: #60A5FA; }
+[data-theme="dark"] .text-\[var\(--brand-violet\)\] { color: #A78BFA; }
+[data-theme="dark"] .text-\[var\(--brand-gold\)\] { color: #FBBF24; }
+[data-theme="dark"] .text-\[var\(--brand-primary\)\] { color: #818CF8; }
 
 /* ── TAILWIND v4 @theme REGISTRATION ────────────────────────────────────── */
 @theme {
@@ -198,7 +186,7 @@
   --radius-3xl: 24px;
 
   /* Font families */
-  --font-sans: 'Inter', 'Outfit', system-ui, sans-serif;
+  --font-sans: 'Outfit', 'Inter', system-ui, sans-serif;
   --font-display: 'Outfit', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
@@ -219,7 +207,7 @@
   }
 
   body {
-    font-family: 'Inter', 'Outfit', sans-serif;
+    font-family: 'Outfit', 'Inter', sans-serif;
     background-color: var(--c-bg);
     background-image: var(--c-bg-gradient);
     background-attachment: fixed;
@@ -811,7 +799,7 @@
   border-radius: 8px;
   border: 1px solid transparent;
   cursor: pointer;
-  font-family: 'Inter', 'Outfit', sans-serif;
+  font-family: 'Outfit', 'Inter', sans-serif;
   font-size: 13.5px;
   font-weight: 600;
   transition: all 0.18s ease;

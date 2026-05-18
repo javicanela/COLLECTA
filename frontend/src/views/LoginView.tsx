@@ -3,6 +3,7 @@ import { Lock as LockIcon, User as UserIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { getExternalAuthProviderStatus, startSupabaseLogin } from '../services/externalAuthProvider';
 import { LoginProviderPanel } from './LoginProviderPanel';
+import collectaMarkUrl from '../assets/collecta-mark.svg';
 
 export default function LoginView() {
   const login = useAuthStore((s) => s.login);
@@ -34,7 +35,7 @@ export default function LoginView() {
   };
 
   return (
-    <div className="min-h-screen w-full flex bg-[#0b0a1d] text-white font-sans">
+    <div className="min-h-screen w-full flex bg-[#0C0E1A] text-white font-sans">
       {/* ═══════════ LEFT PANEL — Metrics ═══════════ */}
       <aside className="hidden md:flex flex-1 bg-white text-slate-900 relative p-8 lg:p-10 flex-col">
         <div className="grid grid-cols-3 grid-rows-3 gap-4 lg:gap-5 flex-1 auto-rows-fr">
@@ -66,12 +67,12 @@ export default function LoginView() {
           </div>
 
           {/* 3. REDUCCIÓN DE DEUDA */}
-          <MetricCard borderClass="border-fuchsia-300/60">
+          <MetricCard borderClass="border-brand-primary/35">
             <div className="flex items-start justify-between">
               <h3 className="text-[11px] lg:text-xs font-bold tracking-widest text-slate-800 leading-tight uppercase">
                 REDUCCIÓN<br />DE DEUDA
               </h3>
-              <TrendDownIcon className="text-fuchsia-500 shrink-0" />
+              <TrendDownIcon className="text-brand-primary shrink-0" />
             </div>
             <div className="mt-4 flex-1 flex flex-col justify-end">
               <div className="text-5xl lg:text-6xl font-bold tracking-tight text-[#0d2650] leading-none">-38%</div>
@@ -122,7 +123,7 @@ export default function LoginView() {
           </MetricCard>
 
           {/* 7. AUTOMATIZACIÓN IA (wide) */}
-          <MetricCard borderClass="border-purple-400/60" className="col-span-2">
+          <MetricCard borderClass="border-brand-primary/35" className="col-span-2">
             <div className="flex items-start justify-between">
               <h3 className="text-[11px] lg:text-xs font-bold tracking-widest text-slate-800 leading-tight uppercase">
                 AUTOMATIZACIÓN IA
@@ -133,7 +134,7 @@ export default function LoginView() {
                 <div className="text-5xl lg:text-6xl font-bold tracking-tight text-[#0d2650] leading-none">2 min</div>
                 <p className="mt-2 text-sm text-slate-600">Mapeo instantáneo.</p>
               </div>
-              <BrainIcon className="text-purple-500 shrink-0" />
+              <BrainIcon className="text-brand-primary shrink-0" />
             </div>
           </MetricCard>
         </div>
@@ -160,17 +161,23 @@ export default function LoginView() {
           <div
             className="rounded-[28px] p-8 lg:p-10 border border-white/10 backdrop-blur-xl"
             style={{
-              background: 'linear-gradient(160deg, rgba(40,35,80,0.55) 0%, rgba(22,20,50,0.55) 100%)',
+              background: 'linear-gradient(160deg, rgba(26,31,60,0.72) 0%, rgba(15,21,35,0.74) 100%)',
               boxShadow:
-                '0 30px 80px -20px rgba(124,58,237,0.25), inset 0 1px 0 rgba(255,255,255,0.08)',
+                '0 30px 80px -20px rgba(59,79,232,0.28), inset 0 1px 0 rgba(255,255,255,0.08)',
             }}
           >
             {/* Logo */}
             <div className="flex items-center gap-3 mb-8">
-              <ShieldLogo />
+              <img
+                src={collectaMarkUrl}
+                alt="Collecta"
+                width={46}
+                height={46}
+                className="h-11 w-11 rounded-xl shadow-[0_12px_28px_rgba(0,0,0,0.28)]"
+              />
               <span
                 className="text-3xl font-semibold tracking-wider text-white/95"
-                style={{ fontFamily: "'Outfit', serif", letterSpacing: '0.15em' }}
+                style={{ fontFamily: "'Outfit', sans-serif", letterSpacing: '0.15em' }}
               >
                 COLLECTA
               </span>
@@ -194,7 +201,7 @@ export default function LoginView() {
                     placeholder="correo@despacho.mx"
                     autoComplete="username"
                     disabled={isLoading}
-                    className="w-full pl-4 pr-11 py-3 rounded-xl bg-white/5 border border-purple-400/50 text-white text-sm placeholder:text-white/35 outline-none transition focus:border-purple-300 focus:bg-white/10 focus:shadow-[0_0_0_3px_rgba(168,85,247,0.15)] disabled:opacity-50"
+                    className="w-full pl-4 pr-11 py-3 rounded-xl bg-white/5 border border-brand-primary/45 text-white text-sm placeholder:text-white/35 outline-none transition focus:border-brand-primary focus:bg-white/10 focus:shadow-[0_0_0_3px_rgba(59,79,232,0.18)] disabled:opacity-50"
                   />
                   <UserIcon className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/40" />
                 </div>
@@ -216,7 +223,7 @@ export default function LoginView() {
                     placeholder="••••••••"
                     autoComplete="current-password"
                     disabled={isLoading}
-                    className="w-full pl-4 pr-11 py-3 rounded-xl bg-white/5 border border-purple-400/50 text-white text-sm placeholder:text-white/35 outline-none transition focus:border-purple-300 focus:bg-white/10 focus:shadow-[0_0_0_3px_rgba(168,85,247,0.15)] disabled:opacity-50"
+                    className="w-full pl-4 pr-11 py-3 rounded-xl bg-white/5 border border-brand-primary/45 text-white text-sm placeholder:text-white/35 outline-none transition focus:border-brand-primary focus:bg-white/10 focus:shadow-[0_0_0_3px_rgba(59,79,232,0.18)] disabled:opacity-50"
                   />
                   <LockIcon className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/40" />
                 </div>
@@ -231,7 +238,7 @@ export default function LoginView() {
                   DESBLOQUEA EL<br />
                   POTENCIAL DE<br />
                   TU DESPACHO<br />
-                  CON <span className="text-purple-400">COLLECTA</span>
+                  CON <span className="text-[#818CF8]">COLLECTA</span>
                 </h1>
                 <p className="mt-4 text-sm text-white/60 leading-relaxed">
                   Inicia sesión para gestionar<br />
@@ -256,7 +263,7 @@ export default function LoginView() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-400 hover:to-violet-500 text-white text-sm font-semibold tracking-wide transition shadow-lg shadow-purple-900/40 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 rounded-xl bg-brand-primary hover:bg-[#3142C7] text-white text-sm font-semibold tracking-wide transition shadow-lg shadow-[rgba(59,79,232,0.28)] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Verificando...' : 'Ingresar'}
               </button>
@@ -272,14 +279,14 @@ export default function LoginView() {
           {/* Footer */}
           <p className="mt-6 text-center text-sm text-white/50">
             ¿Problemas para acceder?{' '}
-            <a href="mailto:admin@collecta.mx" className="text-purple-300 hover:text-purple-200 underline underline-offset-2">
+            <a href="mailto:admin@collecta.mx" className="text-[#A5B4FC] hover:text-white underline underline-offset-2">
               Contacta al administrador
             </a>
           </p>
         </div>
 
         {/* Bottom right sparkle */}
-        <DiamondSparkle className="absolute bottom-6 right-6 text-purple-400/80 z-10" />
+        <DiamondSparkle className="absolute bottom-6 right-6 text-brand-primary/70 z-10" />
       </section>
     </div>
   );
@@ -336,52 +343,6 @@ function StarfieldBg() {
     </div>
   );
 }
-
-function ShieldLogo() {
-  return (
-    <svg width="46" height="52" viewBox="0 0 46 52" fill="none" aria-hidden>
-      <defs>
-        <linearGradient id="shieldGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#cbd5e1" />
-          <stop offset="0.5" stopColor="#94a3b8" />
-          <stop offset="1" stopColor="#64748b" />
-        </linearGradient>
-        <linearGradient id="shieldGradInner" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#a78bfa" />
-          <stop offset="1" stopColor="#6d28d9" />
-        </linearGradient>
-      </defs>
-      {/* Crown */}
-      <path d="M15 8 L19 4 L23 7 L27 4 L31 8 L30 11 H16 Z" fill="url(#shieldGrad)" stroke="#475569" strokeWidth="0.6" />
-      {/* Shield body */}
-      <path
-        d="M23 11 L36 13 V28 C36 38 30 44 23 48 C16 44 10 38 10 28 V13 Z"
-        fill="url(#shieldGrad)"
-        stroke="#334155"
-        strokeWidth="0.7"
-      />
-      <path
-        d="M23 14 L33 16 V28 C33 36 28 41 23 44 C18 41 13 36 13 28 V16 Z"
-        fill="url(#shieldGradInner)"
-        opacity="0.25"
-      />
-      {/* Dollar */}
-      <text
-        x="23"
-        y="33"
-        textAnchor="middle"
-        fontSize="15"
-        fontWeight="800"
-        fill="#1e1b4b"
-        fontFamily="Outfit, sans-serif"
-      >
-        $
-      </text>
-    </svg>
-  );
-}
-
-
 
 function DiamondSparkle({ className = '' }: { className?: string }) {
   return (

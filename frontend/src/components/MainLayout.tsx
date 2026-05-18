@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { api } from '../services/api';
-import { Sun, Moon, Menu, X, Wallet, LogOut } from 'lucide-react';
+import { Sun, Moon, Menu, X, LogOut } from 'lucide-react';
 import { useOperationStore } from '../stores/useOperationStore';
 import { useTheme } from '../hooks/useTheme';
 import { useToast } from '../hooks/useToast';
@@ -19,6 +19,7 @@ import { PageHeader } from './layout/PageHeader';
 import { StatusRail, type RailServiceStatus, type WhatsAppConnectionStatus } from './layout/StatusRail';
 import type { DiagnosticsReadinessCheck, DiagnosticsReadinessResponse } from '../types';
 import { useAuthStore } from '../stores/useAuthStore';
+import collectaMarkUrl from '../assets/collecta-mark.svg';
 
 /* ── MainLayout ─────────────────────────────────────────────────────────── */
 
@@ -27,6 +28,18 @@ interface SidebarNavProps {
   isMobile: boolean;
   vencidasCount: number;
   onNavigate: () => void;
+}
+
+function BrandMark({ className = 'h-8 w-8' }: { className?: string }) {
+  return (
+    <img
+      src={collectaMarkUrl}
+      alt="Collecta"
+      className={`${className} flex-shrink-0 rounded-md shadow-[0_8px_18px_rgba(15,21,35,0.18)]`}
+      width={32}
+      height={32}
+    />
+  );
 }
 
 function SidebarNav({ currentPath, isMobile, vencidasCount, onNavigate }: SidebarNavProps) {
@@ -102,12 +115,7 @@ export function SidebarFooter({
   return (
     <div className="mt-auto border-t border-[var(--sidebar-border)] px-3 py-3">
       <div className="flex items-center gap-2.5 px-2">
-        <div
-          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-xs font-bold text-white"
-          style={{ background: 'var(--brand-primary)' }}
-        >
-          C
-        </div>
+        <BrandMark />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-[var(--sidebar-text-active)]">{userName}</p>
           <p className="truncate text-[10px] text-[var(--sidebar-text)] opacity-50">{userRole}</p>
@@ -310,12 +318,7 @@ export default function MainLayout() {
         {/* Sidebar header */}
         <div className="flex flex-shrink-0 items-center justify-between border-b border-[var(--sidebar-border)] px-4 py-4">
           <div className="flex items-center gap-2.5">
-            <div
-              className="flex h-8 w-8 items-center justify-center rounded-md"
-              style={{ background: 'var(--brand-primary)' }}
-            >
-              <Wallet size={16} className="text-white" />
-            </div>
+            <BrandMark />
             <div>
               <h1 className="text-sm font-bold tracking-tight text-[var(--sidebar-text-active)]">
                 Collecta
@@ -361,6 +364,7 @@ export default function MainLayout() {
             >
               <Menu size={20} />
             </button>
+            <BrandMark className="h-7 w-7" />
             <span className="text-sm font-bold text-[var(--c-text)]">Collecta</span>
           </div>
           <div className="flex items-center gap-2">

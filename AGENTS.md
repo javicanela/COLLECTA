@@ -22,6 +22,14 @@ Antes de cambiar comportamiento, valida contra:
 
 - El producto es Collecta.
 - Collecta es un SaaS de cobranza inteligente para despachos contables.
+- La unica version de producto en construccion es la version final SaaS web
+  publica, multi-tenant, usable en desktop y movil.
+- Los flujos locales existen solo como entorno tecnico interno para construir,
+  probar y depurar esa misma version final; no son una version paralela ni una
+  opcion distribuible para clientes.
+- Primero debe existir una version operable real. Despues de eso, cada mejora se
+  trabaja como una actualizacion de la version final y se valida en un respaldo
+  o entorno staging antes de afectar la instancia que usa el usuario.
 - No hardcodear nombres de clientes como marca visible del sistema.
 - Los clientes especificos pueden aparecer como datos historicos, no como marca
   del producto.
@@ -47,6 +55,32 @@ Antes de cambiar comportamiento, valida contra:
 - Trabajar por ramas y con cambios pequenos.
 - No mezclar refactors con features.
 - Ejecutar build/test cuando aplique y documentar bloqueos reales.
+
+## Flujo permanente de ramas
+
+Antes de iniciar nuevos cambios funcionales, Codex debe consolidar el progreso
+mas reciente:
+
+- Revisar `git status`, ramas locales/remotas y worktrees activos.
+- Identificar la punta mas nueva que ya contiene el historial principal.
+- Integrar ramas pendientes relevantes con merges normales, sin reescribir
+  historia ni descartar cambios del usuario.
+- Resolver conflictos preservando comportamiento existente.
+- Ejecutar la verificacion aplicable antes de afirmar que el estado esta listo.
+- Crear commit con el estado consolidado y hacer push de la rama vigente.
+- Solo despues continuar con la siguiente fase de implementacion.
+
+## Flujo permanente de actualizaciones
+
+- La prioridad actual es construir la primera version operable publica.
+- Cuando esa version exista, no se trabaja sobre variantes paralelas del producto:
+  se preparan actualizaciones de la misma version final.
+- Cada actualizacion debe probarse primero contra un respaldo o entorno staging
+  con datos seguros antes de tocar produccion.
+- Si una actualizacion falla en staging, se corrige ahi; no se promueve a la
+  version usada por el usuario.
+- Produccion debe conservar una ruta clara de rollback o restauracion antes de
+  aplicar cambios de riesgo.
 
 ## Smart Import
 

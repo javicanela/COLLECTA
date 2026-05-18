@@ -27,7 +27,7 @@ normalizados a Collecta con el menor trabajo manual posible.
 | PDF | Parcial | `frontend/src/services/pdfService.tsx`, `backend/src/routes/cobranza.ts` | Frontend y backend generan PDF; envio WA requiere integracion posterior. |
 | Exportaciones | Existe | `frontend/src/views/ExportView.tsx` | Export XLSX/PDF desde frontend. |
 | Reporting | Parcial | Dashboard, export y n8n report | Falta monitoreo y reporting final de SaaS. |
-| Deploy | Parcial | `frontend/vercel.json`, docs | Vercel/Railway son target; no tocar secrets en esta fase. |
+| Deploy | Parcial | `frontend/vercel.json`, `backend/railway.json`, docs | Vercel/Railway/Neon son el deploy oficial; no tocar secrets en git. |
 
 ## 3. Lo que ya existe
 
@@ -63,6 +63,8 @@ normalizados a Collecta con el menor trabajo manual posible.
 ## 6. Decisiones tecnicas oficiales
 
 - PostgreSQL/Neon es la DB oficial.
+- Vercel es el host oficial del frontend publico.
+- Railway es el host oficial del backend Express.
 - Prisma schema es la fuente de verdad del modelo.
 - `/api/n8n/*` requiere `Authorization: Bearer <API_KEY>` o JWT valido.
 - `/api/webhooks/evolution` usa `X-Webhook-Secret` si `EVOLUTION_WEBHOOK_SECRET`
@@ -153,11 +155,25 @@ Objetivo: generar y enviar estados de cuenta con tracking.
 
 Tareas: storage temporal, URL segura, Evolution media o email.
 
-### Fase 8 - QA, CI/CD y monitoreo
+### Fase 8 - SaaS publico, QA, CI/CD y monitoreo
 
-Objetivo: cerrar calidad de SaaS.
+Objetivo: publicar Collecta como URL publica multi-tenant, accesible desde
+desktop y movil, con backend hosteado y datos aislados por despacho.
 
-Tareas: builds, tests, smoke tests, observabilidad y deploy pipeline.
+Tareas:
+
+- Implementar multi-tenant con `Organization` y filtros por `organizationId`.
+- Habilitar signup/login publico para despachos nuevos.
+- Auditar responsive real en iPhone 14 y Pixel 7.
+- Completar PWA instalable con iconos PNG reales.
+- Crear PostgreSQL gestionado en Neon.
+- Desplegar backend en Railway con migraciones Prisma y healthcheck.
+- Desplegar frontend en Vercel apuntando al backend publico.
+- Configurar `ALLOWED_ORIGINS` sin hardcodear secretos.
+- Validar aislamiento con dos despachos y prueba directa contra API.
+- Ejecutar builds, tests, smoke tests, Lighthouse mobile y verificacion PWA.
+
+No tocar: secretos en git ni dominios externos sin confirmacion del usuario.
 
 ## 8. Backlog priorizado
 
