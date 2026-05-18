@@ -16,6 +16,7 @@ ON CONFLICT ("id") DO NOTHING;
 CREATE UNIQUE INDEX "Organization_slug_key" ON "Organization"("slug");
 
 ALTER TABLE "User" ADD COLUMN "organizationId" TEXT NOT NULL DEFAULT 'default';
+ALTER TABLE "User" ADD COLUMN "passwordHash" TEXT NOT NULL DEFAULT '';
 ALTER TABLE "Client" ADD COLUMN "organizationId" TEXT NOT NULL DEFAULT 'default';
 ALTER TABLE "Operation" ADD COLUMN "organizationId" TEXT NOT NULL DEFAULT 'default';
 ALTER TABLE "LogEntry" ADD COLUMN "organizationId" TEXT NOT NULL DEFAULT 'default';

@@ -14,6 +14,7 @@ model User {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
   email          String?      @unique
+  passwordHash   String       @default("")
   role           String       @default("asesor")
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
