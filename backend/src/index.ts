@@ -67,13 +67,31 @@ app.use((req, _res, next) => {
 });
 
 // CORS configuration
+// Supports:
+//   - "*"                              → allow any origin (dev/staging only)
+//   - "https://app.example.com"        → exact match
+//   - "https://*.vercel.app"           → wildcard subdomain match
+// Multiple entries comma-separated.
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,https://collecta-azure.vercel.app')
   .split(',')
-  .map(o => o.trim());
+  .map(o => o.trim())
+  .filter(Boolean);
+
+function originMatches(origin: string, pattern: string): boolean {
+  if (pattern === '*') return true;
+  if (pattern === origin) return true;
+  if (pattern.includes('*')) {
+    const escaped = pattern
+      .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\*/g, '[^.]+');
+    return new RegExp(`^${escaped}$`).test(origin);
+  }
+  return false;
+}
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+    if (!origin || ALLOWED_ORIGINS.some(p => originMatches(origin, p))) {
       callback(null, true);
     } else {
       callback(new Error(`CORS: origen no permitido: ${origin}`));
