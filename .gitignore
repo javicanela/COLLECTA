@@ -70,5 +70,11 @@ n8n/templates/
 test-*.js
 debug-*.js
 /*.png
+/*.jpg
+/*.jpeg
+
+# Local deploy platform metadata
+.vercel/
+frontend/.vercel/
 
 .ai-status/*/status-live.json
