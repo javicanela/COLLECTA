@@ -187,6 +187,7 @@ export async function sendStatementToClient(params: {
 
   const statement = await generateClientStatementPdfBuffer(client.rfc, organizationId);
   const stored = await storeTemporaryPdf({
+    organizationId,
     buffer: statement.buffer,
     fileName: statement.fileName,
     contentType: 'application/pdf',

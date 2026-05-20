@@ -58,6 +58,35 @@ describe('auth middleware principal contract', () => {
     });
   });
 
+  it('maps API key automation organization header into the service principal', async () => {
+    const res = await createProtectedApp()
+      .get('/protected')
+      .set({
+        Authorization: `Bearer ${process.env.API_KEY}`,
+        'X-Collecta-Organization-Id': 'org-automation',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.user).toMatchObject({
+      userId: 'api-key',
+      role: 'service',
+      authSource: 'api_key',
+      organizationId: 'org-automation',
+    });
+  });
+
+  it('rejects unsafe API key organization headers', async () => {
+    const res = await createProtectedApp()
+      .get('/protected')
+      .set({
+        Authorization: `Bearer ${process.env.API_KEY}`,
+        'X-Collecta-Organization-Id': '../org',
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'organization_id_invalid' });
+  });
+
   it('maps local JWT organizationId into the authenticated principal', async () => {
     const token = jwt.sign(
       {

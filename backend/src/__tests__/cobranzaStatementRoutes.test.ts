@@ -1,10 +1,16 @@
 import express from 'express';
 import request from 'supertest';
+import * as jwt from 'jsonwebtoken';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { requireAuth } from '../middleware/auth';
 import cobranzaRoutes, { cobranzaPublicRouter } from '../routes/cobranza';
 import { sendStatementToClient } from '../services/statementDeliveryService';
 import { storeTemporaryPdf } from '../services/tempFileStorage';
+import { generateEstadoCuenta } from '../services/pdfGenerator';
+
+type PdfDocLike = {
+  text: (content: string) => unknown;
+};
 
 vi.mock('../services/statementDeliveryService', () => ({
   sendStatementToClient: vi.fn(async () => ({
@@ -16,6 +22,20 @@ vi.mock('../services/statementDeliveryService', () => ({
   })),
 }));
 
+vi.mock('../services/pdfGenerator', () => ({
+  generateEstadoCuenta: vi.fn(async () => ({
+    cliente: { nombre: 'Cliente Prueba', rfc: 'XAXX010101000' },
+    pendientes: [],
+    pagados: [],
+    totalPendiente: 0,
+    totalPagado: 0,
+    config: {},
+  })),
+  renderEstadoCuentaPdf: vi.fn((doc: PdfDocLike) => {
+    doc.text('Estado de cuenta de prueba');
+  }),
+}));
+
 function buildApp() {
   const app = express();
   app.use(express.json());
@@ -25,6 +45,18 @@ function buildApp() {
 }
 
 const authHeader = { Authorization: `Bearer ${process.env.API_KEY || 'test_api_key_12345678901234567890'}` };
+const jwtSecret = 'test_jwt_secret_123456789012345678901234567890';
+
+function authHeaderForOrg(organizationId: string) {
+  process.env.JWT_SECRET = jwtSecret;
+  const token = jwt.sign({
+    userId: 'user-org',
+    email: 'admin@collecta.test',
+    role: 'admin',
+    organizationId,
+  }, jwtSecret);
+  return { Authorization: `Bearer ${token}` };
+}
 
 beforeEach(() => {
   process.env.API_KEY = process.env.API_KEY || 'test_api_key_12345678901234567890';
@@ -57,9 +89,25 @@ describe('POST /api/cobranza/cliente/:rfc/send-statement', () => {
       messageId: 'wamid-statement-1',
     });
     expect(sendStatementToClient).toHaveBeenCalledWith({
+      organizationId: 'default',
       rfc: 'XAXX010101000',
       channelPreference: 'AUTO',
       requestedBy: 'api-key',
+    });
+  });
+
+  it('passes the authenticated organization scope to statement delivery', async () => {
+    const res = await buildApp()
+      .post('/api/cobranza/cliente/XAXX010101000/send-statement')
+      .set(authHeaderForOrg('org-cobranza'))
+      .send({ channelPreference: 'AUTO' });
+
+    expect(res.status).toBe(200);
+    expect(sendStatementToClient).toHaveBeenCalledWith({
+      organizationId: 'org-cobranza',
+      rfc: 'XAXX010101000',
+      channelPreference: 'AUTO',
+      requestedBy: 'user-org',
     });
   });
 
@@ -101,10 +149,23 @@ describe('POST /api/cobranza/operation/:operationId/send-statement', () => {
 
     expect(res.status).toBe(200);
     expect(sendStatementToClient).toHaveBeenCalledWith({
+      organizationId: 'default',
       operationId: 'operation-1',
       channelPreference: 'EMAIL',
       requestedBy: 'api-key',
     });
+  });
+});
+
+describe('GET /api/cobranza/cliente/:rfc/pdf', () => {
+  it('generates the PDF with the authenticated organization scope', async () => {
+    const res = await buildApp()
+      .get('/api/cobranza/cliente/XAXX010101000/pdf')
+      .set(authHeaderForOrg('org-pdf'));
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('application/pdf');
+    expect(generateEstadoCuenta).toHaveBeenCalledWith('XAXX010101000', 'org-pdf');
   });
 });
 

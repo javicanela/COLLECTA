@@ -29,15 +29,15 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `cd "${BACKEND_DIR}" && npm run dev`,
+      command: `cd "${BACKEND_DIR}" && set AUTH_RATE_LIMIT_MAX=9999&& npm run test:prepare && npm run dev:test`,
       port: 3001,
-      reuseExistingServer: !process.env.CI,
-      timeout: 30000,
+      reuseExistingServer: false,
+      timeout: 60000,
     },
     {
       command: 'npm run dev',
       port: 5173,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       timeout: 30000,
     },
   ],

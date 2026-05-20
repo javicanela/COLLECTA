@@ -9,6 +9,7 @@ interface AuthStore {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
+  signup: (input: { organizationName: string; name: string; email: string; password: string }) => Promise<boolean>;
   logout: () => void;
   checkAuth: () => Promise<void>;
   updateUser: (user: Partial<User>) => void;
@@ -47,6 +48,20 @@ export const useAuthStore = create<AuthStore>()((set) => ({
     } catch (err) {
       set({ isLoading: false });
       console.error('Login failed:', err);
+      return false;
+    }
+  },
+
+  signup: async (input) => {
+    set({ isLoading: true });
+    try {
+      const result = await authService.signup(input);
+      setStoredToken(result.token);
+      set({ user: result.user, token: result.token, isAuthenticated: true, isLoading: false });
+      return true;
+    } catch (err) {
+      set({ isLoading: false });
+      console.error('Signup failed:', err);
       return false;
     }
   },

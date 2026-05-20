@@ -8,7 +8,16 @@ export interface LoginResponse {
     email: string;
     role: string;
     authSource?: string;
+    organizationId?: string;
+    organizationName?: string;
   };
+}
+
+export interface SignupInput {
+  organizationName: string;
+  name: string;
+  email: string;
+  password: string;
 }
 
 export interface VerifyResponse {
@@ -52,6 +61,13 @@ export const authService = {
     return request<LoginResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
+    });
+  },
+
+  async signup(input: SignupInput): Promise<LoginResponse> {
+    return request<LoginResponse>('/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify(input),
     });
   },
 

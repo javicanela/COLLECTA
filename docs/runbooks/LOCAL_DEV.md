@@ -7,7 +7,7 @@ version final SaaS. Este archivo no define una segunda version del producto ni
 un camino distribuible para despachos contables.
 
 La unica version final es la URL publica multi-tenant descrita en
-`docs/runbooks/ABRE_FACIL_VERSION_FINAL.md`.
+`docs/runbooks/COLLECTA_SAAS_WEB.md`.
 
 ## Requisitos
 
@@ -98,7 +98,7 @@ Offline no permite:
 - sincronizar cartera compartida;
 - crear clientes u operaciones en backend;
 - enviar o confirmar cobranza;
-- refrescar dashboards desde PostgreSQL/Neon;
+- refrescar dashboards desde PostgreSQL/Supabase;
 - generar reportes con datos no cacheados.
 
 Cuando no hay conexion, Smart Import muestra:

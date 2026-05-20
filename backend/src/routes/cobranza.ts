@@ -5,6 +5,7 @@ import PDFDocument from 'pdfkit';
 import { generateEstadoCuenta, renderEstadoCuentaPdf } from '../services/pdfGenerator';
 import { sendStatementToClient, StatementDeliveryError } from '../services/statementDeliveryService';
 import { getTemporaryPdf } from '../services/tempFileStorage';
+import { requireOrg } from '../lib/tenant';
 
 const router = Router();
 export const cobranzaPublicRouter = Router();
@@ -54,7 +55,8 @@ cobranzaPublicRouter.get('/media/:token', async (req: Request, res: Response) =>
 router.get('/cliente/:rfc/pdf', async (req: Request, res: Response) => {
   try {
     const rfc = Array.isArray(req.params.rfc) ? req.params.rfc[0] : req.params.rfc;
-    const data = await generateEstadoCuenta(rfc);
+    const organizationId = requireOrg(req);
+    const data = await generateEstadoCuenta(rfc, organizationId);
 
     const doc = new PDFDocument({ margin: 50 });
     res.setHeader('Content-Type', 'application/pdf');
@@ -82,6 +84,7 @@ router.post('/cliente/:rfc/send-statement', async (req: Request, res: Response) 
   try {
     const rfc = Array.isArray(req.params.rfc) ? req.params.rfc[0] : req.params.rfc;
     const result = await sendStatementToClient({
+      organizationId: requireOrg(req),
       rfc,
       channelPreference: parsed.data.channelPreference,
       requestedBy: getRequestedBy(req),
@@ -106,6 +109,7 @@ router.post('/operation/:operationId/send-statement', async (req: Request, res: 
   try {
     const operationId = Array.isArray(req.params.operationId) ? req.params.operationId[0] : req.params.operationId;
     const result = await sendStatementToClient({
+      organizationId: requireOrg(req),
       operationId,
       channelPreference: parsed.data.channelPreference,
       requestedBy: getRequestedBy(req),

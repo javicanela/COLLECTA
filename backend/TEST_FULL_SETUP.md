@@ -4,7 +4,7 @@
 
 `npm run test:full` ejecuta suites de integracion que preparan una base
 PostgreSQL, aplican Prisma y pueden escribir datos. Este flujo no debe tocar
-Neon, Supabase, Railway, staging, produccion, WhatsApp real, email real, AI real
+Supabase, Render, Vercel, staging, produccion, WhatsApp real, email real, AI real
 ni proveedores de pago reales.
 
 ## 2. Crear `.env.test`
@@ -43,7 +43,7 @@ El guard acepta hosts locales o nombres claramente de test:
 
 No uses URLs ni credenciales de:
 
-- Neon, Supabase, Railway, AWS RDS, Azure, Render, Vercel, PlanetScale, Heroku
+- Supabase, Render, Vercel, Neon, AWS RDS, Azure, PlanetScale, Heroku
 - produccion o staging
 - WhatsApp/Evolution real
 - Gemini, Groq, OpenRouter o webhooks de pago reales
@@ -69,7 +69,9 @@ npm run test:full
 
 `test:full` ejecuta `test:prepare`, y `test:prepare` corre primero
 `npm run db:guard`, luego `scripts/ensure-test-db.js` y finalmente
-`prisma db push --skip-generate`.
+`prisma db push --skip-generate --accept-data-loss`. La bandera de perdida de
+datos solo se usa en esta ruta de test y queda precedida por `db:guard`; no debe
+copiarse a comandos contra staging o produccion.
 
 ## 8. Cuando NO correr `test:full`
 

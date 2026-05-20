@@ -1,16 +1,9 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
-
-const API_BASE = 'http://localhost:3001/api';
-const ADMIN_USER = process.env.ADMIN_USER || 'admin';
-const ADMIN_PASS = process.env.ADMIN_PASS || 'test-admin-password';
+import { API_BASE, createLoggedInSaasAccount } from './helpers/auth';
 
 async function loginViaApi(request: APIRequestContext): Promise<string> {
-  const res = await request.post(`${API_BASE}/auth/login`, {
-    data: { email: ADMIN_USER, password: ADMIN_PASS },
-  });
-  expect(res.status()).toBe(200);
-  const body = await res.json() as { token: string };
-  return body.token as string;
+  const { token } = await createLoggedInSaasAccount(request, 'dashboard');
+  return token;
 }
 
 test.describe('Dashboard (Cartera) flow', () => {
@@ -34,7 +27,7 @@ test.describe('Dashboard (Cartera) flow', () => {
       headers: authHeaders,
       data: {
         nombre: 'E2E Test Client',
-        rfc: 'E2E991234XX',
+        rfc: 'ABC991234XX',
         telefono: '5550000001',
         email: 'e2e@test.mx',
       },
@@ -51,7 +44,7 @@ test.describe('Dashboard (Cartera) flow', () => {
         tipo: 'FACTURA',
         descripcion: 'E2E Test Operation',
         monto: 9999.99,
-        fechaVence: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+        fechaVence: new Date(Date.now() + 7 * 86400000).toISOString(),
         asesor: 'Test Agent',
       },
     });
@@ -62,6 +55,6 @@ test.describe('Dashboard (Cartera) flow', () => {
     }, token);
     await page.goto('/');
 
-    await expect(page.getByText(/e2e/i).or(page.getByText(/E2E991234XX/i))).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/ABC991234XX/i).first()).toBeVisible({ timeout: 10000 });
   });
 });

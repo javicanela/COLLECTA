@@ -21,7 +21,7 @@ const baseLog: LogEntry = {
   createdAt: '2026-05-10T18:30:00.000Z',
   client: {
     id: 'client-1',
-    nombre: 'Cliente Demo',
+    nombre: 'Cliente Prueba',
     rfc: 'AAA010101AAA',
     telefono: '+52 664 123 4567',
     estado: 'ACTIVO',
@@ -61,7 +61,7 @@ describe('normalizeAuditEvent', () => {
     expect(event.outcome).toBe('SUCCESS');
     expect(event.title).toBe('WhatsApp enviado');
     expect(event.phoneLabel).toBe('+52 ******4567');
-    expect(event.clientName).toBe('Cliente Demo');
+    expect(event.clientName).toBe('Cliente Prueba');
   });
 
   it('parses pipe-separated message metadata into detail rows', () => {
@@ -221,7 +221,7 @@ describe('AuditTimeline', () => {
 
     expect(html).toContain('WhatsApp enviado');
     expect(html).toContain('Pago detectado');
-    expect(html).toContain('Cliente Demo');
+    expect(html).toContain('Cliente Prueba');
     expect(html).toContain('+52 ******4567');
   });
 

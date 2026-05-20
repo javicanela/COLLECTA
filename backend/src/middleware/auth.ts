@@ -12,6 +12,25 @@ export type { AuthenticatedPrincipal } from '../services/authTypes';
 
 const MIN_JWT_SECRET_LENGTH = 32;
 
+function normalizeOrganizationHeader(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return value[0]?.trim();
+  return value?.trim();
+}
+
+function serviceOrganizationId(req: Request): string | undefined {
+  const organizationId =
+    normalizeOrganizationHeader(req.headers['x-collecta-organization-id']) ||
+    normalizeOrganizationHeader(req.headers['x-organization-id']) ||
+    process.env.AUTOMATION_ORGANIZATION_ID?.trim() ||
+    process.env.N8N_ORGANIZATION_ID?.trim();
+
+  if (!organizationId) return undefined;
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(organizationId)) {
+    throw new Error('organization_id_invalid');
+  }
+  return organizationId;
+}
+
 function timingSafeEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
   const bufB = Buffer.from(b);
@@ -91,11 +110,20 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 
   if (API_KEY && timingSafeEqual(token, API_KEY)) {
+    let organizationId: string | undefined;
+    try {
+      organizationId = serviceOrganizationId(req);
+    } catch {
+      res.status(400).json({ error: 'organization_id_invalid' });
+      return;
+    }
+
     req.user = {
       userId: 'api-key',
       email: 'automation@collecta.local',
       role: 'service',
       authSource: 'api_key',
+      organizationId,
     } satisfies AuthenticatedPrincipal;
     next();
     return;

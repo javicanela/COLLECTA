@@ -16,7 +16,7 @@ const log: LogEntry = {
   createdAt: '2026-05-10T18:30:00.000Z',
   client: {
     id: 'client-1',
-    nombre: 'Cliente Demo',
+    nombre: 'Cliente Prueba',
     rfc: 'AAA010101AAA',
     telefono: '+52 664 123 4567',
     estado: 'ACTIVO',

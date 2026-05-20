@@ -17,10 +17,6 @@ interface SupabaseJwtPayload extends jwt.JwtPayload {
     role?: string;
     collecta_role?: string;
   };
-  user_metadata?: {
-    role?: string;
-    collecta_role?: string;
-  };
 }
 
 function envValue(name: string): string | undefined {
@@ -50,9 +46,7 @@ export function getAuthProviderStatus(): AuthProviderStatus[] {
 function providerRoleFromPayload(payload: SupabaseJwtPayload) {
   const rawRole =
     payload.app_metadata?.collecta_role ||
-    payload.user_metadata?.collecta_role ||
     payload.app_metadata?.role ||
-    payload.user_metadata?.role ||
     payload.role;
 
   const role = normalizePrincipalRole(rawRole, 'asesor');

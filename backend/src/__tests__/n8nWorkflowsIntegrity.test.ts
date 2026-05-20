@@ -104,6 +104,12 @@ function authorizationHeader(node: WorkflowNode) {
   );
 }
 
+function organizationHeader(node: WorkflowNode) {
+  return headerParameters(node).find(header =>
+    typeof header.name === 'string' && header.name.toLowerCase() === 'x-collecta-organization-id',
+  );
+}
+
 function hasHardcodedBearer(value: string) {
   const bearerMatch = value.match(/Bearer\s+([^"',\s]+)/i);
   if (!bearerMatch) return false;
@@ -189,6 +195,33 @@ describe('n8n workflow export integrity', () => {
     });
 
     expect(missingAuth).toEqual([]);
+  });
+
+  it('sends an explicit organization header on protected Collecta HTTP nodes', () => {
+    const missingOrganization = workflowFiles.flatMap(fileName => {
+      const workflow = readWorkflow(fileName);
+      return (workflow.nodes ?? [])
+        .filter(node => node.type === 'n8n-nodes-base.httpRequest')
+        .map(node => ({ fileName, node, url: nodeUrl(node) }))
+        .filter(({ url }) => url !== null && isProtectedCollectaUrl(url))
+        .filter(({ node }) => {
+          const header = organizationHeader(node);
+          return (
+            node.parameters?.sendHeaders !== true ||
+            !header ||
+            typeof header.value !== 'string' ||
+            !header.value.includes('$env.COLLECTA_ORGANIZATION_ID')
+          );
+        })
+        .map(({ fileName: file, node, url }) => ({
+          file,
+          nodeId: node.id,
+          nodeName: node.name,
+          url,
+        }));
+    });
+
+    expect(missingOrganization).toEqual([]);
   });
 
   it('keeps workflow 04 wired to send-statement when the backend route exists', () => {

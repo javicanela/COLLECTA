@@ -17,7 +17,7 @@ const PASSWORD_SALT_BYTES = 16;
 
 const loginRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: Number(process.env.AUTH_RATE_LIMIT_MAX || 5),
   message: 'Demasiados intentos de login. Reintenta en 15 minutos.',
 });
 
@@ -189,47 +189,73 @@ router.post('/login', loginRateLimiter, async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    res.status(400).json({ error: 'Email y contraseña son requeridos' });
-    return;
-  }
-
-  if (!isValidAdminCredentials(email, password)) {
-    res.status(401).json({ error: 'Credenciales inválidas' });
+    res.status(400).json({ error: 'Email y password son requeridos' });
     return;
   }
 
   if (!isValidSecret()) {
-    res.status(500).json({ error: 'JWT_SECRET no configurado o es demasiado corto (mínimo 32 caracteres)' });
+    res.status(500).json({ error: 'JWT_SECRET no configurado o es demasiado corto (minimo 32 caracteres)' });
     return;
   }
 
-  // Bug 12: single-tenant admin user is hardcoded for this iteration.
-  // Multi-user support (user table, role assignment, password hashing) is
-  // tracked as a TODO in docs/reports/AUTH_PLATFORM_DECISION_RECORD.md.
-  const principal: AuthenticatedPrincipal = {
-    userId: 'admin-001',
-    email: adminUser(),
-    role: 'admin',
-    authSource: 'local',
-  };
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const configuredAdmin = adminUser();
+  const isConfiguredAdminEmail = !!configuredAdmin && (
+    normalizedEmail === configuredAdmin.toLowerCase() ||
+    normalizedEmail === `${configuredAdmin}@collecta.local`.toLowerCase()
+  );
+  let dbLoginFailed = false;
 
   try {
-    const jti = crypto.randomUUID();
-    const token = jwt.sign(
-      { ...principal, jti },
-      jwtSecret() as string,
-      { expiresIn: TOKEN_EXPIRY },
-    );
+    const user = await prisma.user.findFirst({
+      where: { email: normalizedEmail },
+      include: { organization: true },
+    });
+
+    if (user?.passwordHash && await verifyPassword(password, user.passwordHash)) {
+      const principal: AuthenticatedPrincipal = {
+        userId: user.id,
+        email: user.email || normalizedEmail,
+        role: normalizePrincipalRole(user.role, 'viewer'),
+        authSource: 'local',
+        organizationId: user.organizationId,
+      };
+
+      res.json({
+        token: signPrincipal(principal),
+        user: {
+          ...publicUser(principal, user.organization?.nombre),
+          name: user.name,
+        },
+      });
+      return;
+    }
+  } catch {
+    dbLoginFailed = true;
+  }
+
+  if (isValidAdminCredentials(normalizedEmail, password)) {
+    const principal: AuthenticatedPrincipal = {
+      userId: 'admin-001',
+      email: adminUser(),
+      role: 'admin',
+      authSource: 'local',
+    };
 
     res.json({
-      token,
+      token: signPrincipal(principal),
       user: publicUser(principal),
     });
-  } catch {
-    res.status(500).json({ error: 'Error generando token' });
+    return;
   }
-});
 
+  if (dbLoginFailed && !isConfiguredAdminEmail) {
+    res.status(500).json({ error: 'Error validando credenciales' });
+    return;
+  }
+
+  res.status(401).json({ error: 'Credenciales invalidas' });
+});
 router.post('/verify', verifyRateLimiter, async (req: Request, res: Response) => {
   const authHeader = req.headers['authorization'];
 
@@ -251,6 +277,7 @@ router.post('/verify', verifyRateLimiter, async (req: Request, res: Response) =>
       email?: string;
       role?: string;
       authSource?: string;
+      organizationId?: string;
     };
 
     const principal: AuthenticatedPrincipal = {
@@ -258,6 +285,7 @@ router.post('/verify', verifyRateLimiter, async (req: Request, res: Response) =>
       email: decoded.email,
       role: normalizePrincipalRole(decoded.role, 'viewer'),
       authSource: decoded.authSource === 'local' ? 'local' : 'local',
+      organizationId: decoded.organizationId,
     };
 
     res.json({

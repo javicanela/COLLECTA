@@ -6,6 +6,7 @@ import whatsappRoutes from '../routes/whatsapp';
 import webhookRoutes from '../routes/webhooks';
 
 type ClientRecord = {
+  organizationId: string;
   id: string;
   rfc: string;
   nombre: string;
@@ -37,13 +38,21 @@ vi.mock('../services/evolutionApi', () => ({
 vi.mock('../lib/prisma', () => ({
   prisma: {
     client: {
-      findUnique: vi.fn(async ({ where }: any) =>
-        db.clients.find(client => client.id === where.id) ?? null
-      ),
       findFirst: vi.fn(async ({ where }: any) => {
+        if (where?.id) {
+          return db.clients.find(client => {
+            const idOk = client.id === where.id;
+            const orgOk = where.organizationId ? client.organizationId === where.organizationId : true;
+            return idOk && orgOk;
+          }) ?? null;
+        }
         const phoneContains = where?.telefono?.contains;
         if (!phoneContains) return null;
-        return db.clients.find(client => client.telefono?.includes(phoneContains)) ?? null;
+        return db.clients.find(client => {
+          const phoneOk = client.telefono?.includes(phoneContains);
+          const orgOk = where.organizationId ? client.organizationId === where.organizationId : true;
+          return phoneOk && orgOk;
+        }) ?? null;
       }),
     },
     whatsAppMessage: {
@@ -58,7 +67,8 @@ vi.mock('../lib/prisma', () => ({
           const directionOk = where?.direction ? message.direction === where.direction : true;
           const phoneOk = where?.phone?.contains ? String(message.phone || '').includes(where.phone.contains) : true;
           const evolutionOk = where?.evolutionMsgId ? message.evolutionMsgId === where.evolutionMsgId : true;
-          return clientOk && directionOk && phoneOk && evolutionOk;
+          const orgOk = where?.organizationId ? message.organizationId === where.organizationId : true;
+          return clientOk && directionOk && phoneOk && evolutionOk && orgOk;
         }) ?? null
       ),
       update: vi.fn(async ({ where, data }: any) => {
@@ -91,9 +101,21 @@ vi.mock('../lib/prisma', () => ({
   },
 }));
 
-function buildApp() {
+function buildApp(user?: { organizationId?: string }) {
   const app = express();
   app.use(express.json());
+  if (user) {
+    app.use((req, _res, next) => {
+      req.user = {
+        userId: 'test-user',
+        email: 'admin@collecta.test',
+        role: 'admin',
+        authSource: 'test',
+        organizationId: user.organizationId,
+      };
+      next();
+    });
+  }
   app.use('/api/whatsapp', whatsappRoutes);
   app.use('/api/webhooks', webhookRoutes);
   return request(app);
@@ -103,6 +125,7 @@ let clientCounter = 0;
 function createClient(overrides: Partial<ClientRecord> = {}) {
   clientCounter += 1;
   const client: ClientRecord = {
+    organizationId: 'default',
     id: `client-${clientCounter}`,
     rfc: `WAXX010101${String(clientCounter).padStart(3, '0')}`,
     nombre: 'Cliente WhatsApp',
@@ -159,6 +182,7 @@ describe('POST /api/whatsapp/send', () => {
     expect(evolutionApi.sendTextMessage).toHaveBeenCalledWith(client.telefono, 'Hola cliente');
 
     expect(db.messages[0]).toMatchObject({
+      organizationId: 'default',
       clientId: client.id,
       direction: 'OUTGOING',
       messageType: 'TEXT',
@@ -169,6 +193,7 @@ describe('POST /api/whatsapp/send', () => {
     });
 
     expect(db.logs[0]).toMatchObject({
+      organizationId: 'default',
       clientId: client.id,
       tipo: 'WHATSAPP',
       variante: 'INDIVIDUAL',
@@ -192,6 +217,26 @@ describe('POST /api/whatsapp/send', () => {
     expect(res.body).toEqual({ success: false, error: 'Evolution unavailable' });
     expect(db.messages[0].status).toBe('FAILED');
     expect(db.logs[0].resultado).toBe('ERROR');
+  });
+
+  it('records outbound messages in the authenticated organization scope', async () => {
+    const client = createClient({ organizationId: 'org-whatsapp' });
+
+    const res = await buildApp({ organizationId: 'org-whatsapp' })
+      .post('/api/whatsapp/send')
+      .send({ phone: client.telefono, text: 'Hola tenant', clientId: client.id });
+
+    expect(res.status).toBe(200);
+    expect(db.messages[0]).toMatchObject({
+      organizationId: 'org-whatsapp',
+      clientId: client.id,
+      content: 'Hola tenant',
+    });
+    expect(db.logs[0]).toMatchObject({
+      organizationId: 'org-whatsapp',
+      clientId: client.id,
+      resultado: 'ENVIADO',
+    });
   });
 
   it('blocks suspended clients unless explicitly overridden', async () => {
@@ -251,6 +296,7 @@ describe('POST /api/whatsapp/send-media', () => {
     );
 
     expect(db.messages[0]).toMatchObject({
+      organizationId: 'default',
       clientId: client.id,
       direction: 'OUTGOING',
       messageType: 'DOCUMENT',
@@ -259,6 +305,7 @@ describe('POST /api/whatsapp/send-media', () => {
     });
 
     expect(db.logs[0]).toMatchObject({
+      organizationId: 'default',
       clientId: client.id,
       tipo: 'WHATSAPP',
       variante: 'MEDIA',
@@ -301,6 +348,7 @@ describe('POST /api/webhooks/evolution', () => {
     });
 
     expect(db.messages[0]).toMatchObject({
+      organizationId: 'default',
       clientId: client.id,
       direction: 'INCOMING',
       messageType: 'TEXT',
@@ -311,6 +359,7 @@ describe('POST /api/webhooks/evolution', () => {
     });
 
     expect(db.logs[0]).toMatchObject({
+      organizationId: 'default',
       clientId: client.id,
       tipo: 'INCOMING',
       variante: 'TEXT',

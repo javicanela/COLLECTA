@@ -1,4 +1,4 @@
-# Collecta Abre Facil - SaaS Web Publico
+# Collecta SaaS Web Publico
 
 ## Objetivo
 
@@ -22,7 +22,10 @@ promueve a la instancia que usa el usuario.
 - Multi-tenant con aislamiento de datos por organizacion.
 - Movil usable es requisito de producto.
 - Backend hosteado esta aprobado para esta version.
-- Deploy oficial: frontend en Vercel, backend en Railway y PostgreSQL en Neon.
+- Deploy oficial vigente: frontend en Vercel, backend Node/Express dedicado
+  compatible con la API actual, PostgreSQL y Storage privado en Supabase.
+  Railway queda solo como fallback si se reactiva; no es el camino por defecto
+  mientras el trial este vencido.
 - Smart Import sigue web-first, deterministic-first y provider-agnostic.
 - Cero secretos en git. Variables reales solo en dashboards de plataforma o en
   la sesion local temporal de Codex.
@@ -33,13 +36,13 @@ promueve a la instancia que usa el usuario.
 
 ## Contrato operativo para plataformas externas
 
-Cuando un paso requiera Vercel, Railway, Neon, GitHub, Cloudflare u otra cuenta
+Cuando un paso requiera Vercel, Render, Supabase, GitHub, Cloudflare u otra cuenta
 externa, Codex debe:
 
 1. Abrir el navegador del sistema en la URL de la plataforma con el comando del
    sistema operativo (`Start-Process`, `open` o `xdg-open`).
 2. Esperar a que la sesion del usuario quede activa en ese navegador.
-3. Usar el CLI oficial cuando exista (`vercel`, `railway`, `gh`, `neonctl`,
+3. Usar el CLI oficial cuando exista (`vercel`, `render`, `gh`, `supabase`,
    `wrangler`) para que el flujo sea reproducible.
 4. Si la autenticacion no se puede resolver por CLI, dejar el navegador abierto
    en la pantalla correcta y pedir confirmacion explicita antes de avanzar.
@@ -54,8 +57,9 @@ el switch con el usuario y limpiar artefactos sueltos si quedaron creados.
 | Servicio | Primario | Alternativas |
 |---|---|---|
 | Frontend | Vercel | Cloudflare Pages, Netlify, Render Static |
-| Backend | Railway | Render, Fly.io, Cloudflare Workers si el backend acepta el cambio |
-| Postgres | Neon | Supabase Postgres, Railway Postgres, Render Postgres |
+| Backend | Render puente Node/Express | Vercel Functions si no sacrifica funcionalidad, Fly.io, Koyeb, Railway reactivado |
+| Postgres | Supabase Postgres | Neon, Render Postgres |
+| Storage privado | Supabase Storage | Vercel Blob privado, S3 compatible |
 | Dominio | Dominio elegido por el usuario | Dominio gratis del host |
 | CI release | GitHub Actions | Ejecucion manual local documentada |
 
@@ -66,14 +70,14 @@ externas.
 
 Acciones:
 
-- Crear rama `feat/abre-facil-saas-web`.
-- Reescribir este runbook para describir la version final SaaS, no localhost.
+- Crear rama de trabajo para la version SaaS web publica.
+- Reescribir este runbook para describir Collecta como la version final SaaS, no localhost.
 - Mantener las instrucciones de `localhost` solo como soporte tecnico interno
   de build/test, no como version de producto.
 - Actualizar `AGENTS.md` y `docs/PLAN_DEFINITIVO_COLLECTA.md` para anclar
-  Vercel + Railway + Neon como decision vigente.
-- Confirmar que `frontend/vercel.json`, `backend/railway.json` y los
-  `.env.example` no contienen secretos reales.
+  Vercel + Supabase + backend Node dedicado como decision vigente.
+- Confirmar que `frontend/vercel.json`, `render.yaml`, `backend/railway.json`
+  y los `.env.example` no contienen secretos reales.
 
 Criterio: el diff de esta fase no toca secretos y deja claro que la unica
 version distribuible es Collecta SaaS publico.
@@ -161,48 +165,60 @@ Archivos criticos:
 - `frontend/index.html`: Open Graph y Twitter Card para compartir por WhatsApp
   o email.
 
-## Fase 5 - Base de datos hosteada
+## Fase 5 - Base de datos y storage hosteados
 
-Objetivo: tener `DATABASE_URL` PostgreSQL accesible desde internet.
+Objetivo: tener `DATABASE_URL` PostgreSQL accesible desde internet y storage
+privado para PDFs/adjuntos temporales.
 
-Plan primario: Neon.
+Plan primario: Supabase.
 
 Pasos:
 
-1. Abrir `https://console.neon.tech/`.
+1. Abrir `https://supabase.com/dashboard`.
 2. Esperar sesion activa del usuario.
 3. Crear proyecto `collecta-prod` en la region mas cercana.
-4. Obtener `DATABASE_URL` con `?sslmode=require`.
-5. Validar con `psql "$DATABASE_URL" -c "SELECT 1"` sin guardar el secreto en
-   git.
+4. Obtener `DATABASE_URL` para runtime Prisma y `DIRECT_URL` para migraciones
+   desde el panel Connect.
+5. Crear bucket privado `statement-pdfs`.
+6. Configurar `TEMP_PDF_STORAGE_PROVIDER=supabase`,
+   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` y
+   `SUPABASE_STORAGE_BUCKET=statement-pdfs` en el backend remoto.
+7. Validar con `psql "$DIRECT_URL" -c "SELECT 1"` sin guardar el secreto en git.
 
-Fallback: Supabase Postgres. Si tambien bloquea, Railway Postgres como ultimo
-recurso.
+Fallback DB: Neon. Fallback storage: Vercel Blob privado o S3 compatible.
 
 ## Fase 6 - Despliegue backend
 
 Objetivo: Express + Prisma corriendo en URL publica con healthcheck verde.
 
-Plan primario: Railway.
+Plan primario: Render puente Node/Express mientras se valida Vercel Functions
+sin sacrificar funcionalidad.
 
 Pasos:
 
-1. Abrir `https://railway.app/`.
+1. Abrir `https://dashboard.render.com/`.
 2. Confirmar sesion y conexion con GitHub.
-3. Instalar Railway CLI si falta y correr `railway login`.
-4. Inicializar desde `backend/` o conectar repo desde GitHub.
-5. Configurar variables en Railway:
+3. Crear Blueprint desde `render.yaml` o conectar repo desde GitHub.
+4. Revisar que el servicio use `backend/` como root, `npm ci && npx prisma
+   generate && npm run build` como build, `npx prisma migrate deploy && npm
+   start` como start y `/api/health` como healthcheck.
+5. Configurar variables en Render:
    - `DATABASE_URL`
+   - `DIRECT_URL`
    - `JWT_SECRET`
    - `API_KEY`
-   - `ADMIN_USER`
-   - `ADMIN_PASS`
    - `ALLOWED_ORIGINS` cuando exista la URL de frontend
-6. Confirmar que `backend/railway.json` ejecuta build, migraciones y
-   healthcheck `/api/health`.
-7. Validar `curl https://<servicio>.up.railway.app/api/health`.
+   - `BACKEND_PUBLIC_URL`
+   - `TEMP_PDF_STORAGE_PROVIDER=supabase`
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `SUPABASE_STORAGE_BUCKET=statement-pdfs`
+   - `EVOLUTION_*` si WhatsApp programatico queda habilitado
+6. Validar `curl https://<servicio>.onrender.com/api/health`.
 
-Fallback: Render; despues Fly.io.
+Fallback: Vercel Functions solo despues de adaptar entrada serverless,
+migraciones y storage; despues Fly.io o Koyeb. Railway solo si el servicio se
+reactiva.
 
 ## Fase 7 - Despliegue frontend
 
@@ -217,9 +233,9 @@ Pasos:
 3. Instalar Vercel CLI si falta y correr `vercel login`.
 4. Desde `frontend/`, correr `vercel link` y `vercel --prod`.
 5. Configurar `VITE_API_URL=<backend-public-url>/api`.
-6. Actualizar `frontend/vercel.json` con rewrite `/api/:path*` hacia backend y
-   CORS para el dominio asignado.
-7. Agregar el dominio de Vercel a `ALLOWED_ORIGINS` en Railway.
+6. Confirmar que `frontend/vercel.json` mantiene fallback SPA a `index.html` y
+   que las llamadas API usan `VITE_API_URL`, no placeholders de backend.
+7. Agregar el dominio de Vercel a `ALLOWED_ORIGINS` en el backend dedicado.
 8. Validar signup/login end-to-end y ausencia de errores CORS.
 
 Fallback: Cloudflare Pages; despues Netlify.
@@ -232,7 +248,7 @@ Opciones:
 
 - Sin dominio propio: usar `https://collecta-*.vercel.app`.
 - Con dominio propio: registrar el dominio elegido por el usuario, configurar
-  DNS hacia Vercel y agregarlo a `ALLOWED_ORIGINS` en Railway.
+  DNS hacia Vercel y agregarlo a `ALLOWED_ORIGINS` en el backend dedicado.
 
 El dominio propio es opcional para v1.
 
@@ -275,9 +291,12 @@ No se promueve una variante alternativa del producto.
 ## Bloqueos conocidos
 
 - Si Vercel exige tarjeta o verificacion para builds, saltar a Cloudflare Pages.
-- Si Railway exige upgrade obligatorio, saltar a Render.
-- Si Neon exige tarjeta o limita region, saltar a Supabase.
-- Si una migracion Prisma falla en Neon y no hay datos reales, regenerar la DB.
+- Si Render exige upgrade obligatorio para produccion estable, evaluar Vercel
+  Functions, Fly.io o Koyeb sin recortar funcionalidad.
+- Si Supabase exige tarjeta o limita region, saltar a Neon para DB y Vercel
+  Blob privado o S3 compatible para storage.
+- Si una migracion Prisma falla en Supabase y no hay datos reales, regenerar la
+  DB; con datos reales, restaurar respaldo y corregir en staging.
 - Si HTTPS de dominio propio tarda en propagar, usar dominio del host.
 - Reset de password por email queda fuera de scope inicial.
 

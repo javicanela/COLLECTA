@@ -19,7 +19,7 @@ Indice operativo de documentacion vigente.
 - [Secrets and env safety](runbooks/SECRETS_AND_ENV_SAFETY.md)
 - [Free platform options](runbooks/FREE_PLATFORM_OPTIONS.md)
 - [Operator handoff](runbooks/OPERATOR_HANDOFF.md)
-- [Abre facil version final](runbooks/ABRE_FACIL_VERSION_FINAL.md)
+- [Collecta SaaS web publico](runbooks/COLLECTA_SAAS_WEB.md)
 
 ## Reportes
 

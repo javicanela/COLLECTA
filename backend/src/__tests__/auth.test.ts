@@ -105,6 +105,31 @@ describe('Auth middleware', () => {
     });
   });
 
+  it('ignores Supabase user_metadata for provider authorization roles', async () => {
+    process.env.SUPABASE_JWT_SECRET = 'supabase_test_secret_12345678901234567890';
+    const token = jwt.sign(
+      {
+        sub: 'supabase-user-002',
+        email: 'editable@despacho.mx',
+        user_metadata: { collecta_role: 'admin' },
+      },
+      process.env.SUPABASE_JWT_SECRET,
+      { expiresIn: '1h' },
+    );
+
+    const res = await req
+      .post('/api/auth/verify')
+      .set({ Authorization: `Bearer ${token}` });
+
+    expect(res.status).toBe(200);
+    expect(res.body.user).toMatchObject({
+      id: 'supabase-user-002',
+      email: 'editable@despacho.mx',
+      role: 'asesor',
+      authSource: 'supabase',
+    });
+  });
+
   it('protects all client endpoints', async () => {
     const endpoints = [
       { method: 'get', path: '/api/clients' },

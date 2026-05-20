@@ -18,7 +18,7 @@ const baseOperation: Operation = {
   client: {
     id: 'client-1',
     rfc: 'AAA010101AAA',
-    nombre: 'Cliente Demo',
+    nombre: 'Cliente Prueba',
     telefono: null,
     email: null,
     estado: 'ACTIVO',

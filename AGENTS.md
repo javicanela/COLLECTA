@@ -33,13 +33,22 @@ Antes de cambiar comportamiento, valida contra:
 - No hardcodear nombres de clientes como marca visible del sistema.
 - Los clientes especificos pueden aparecer como datos historicos, no como marca
   del producto.
+- Autenticacion de producto vigente: el flujo real es SaaS multi-tenant con
+  organizaciones y usuarios persistidos en DB con password hasheado. Cualquier
+  login local por `ADMIN_USER`/`ADMIN_PASS` pertenece a una version anterior y
+  solo puede quedar como compatibilidad tecnica temporal; no gobierna producto,
+  UX, criterios de exito ni nuevas pruebas funcionales.
 
 ## Stack vigente
 
 - Frontend: React 19, TypeScript, Vite, TailwindCSS.
 - Backend: Express 5, TypeScript, Prisma.
-- DB oficial: PostgreSQL / Neon.
-- Deploy objetivo: Vercel para frontend, Railway para backend.
+- DB oficial: PostgreSQL / Supabase.
+- Storage oficial para adjuntos/PDFs remotos: Supabase Storage privado.
+- Deploy objetivo: Vercel para frontend y backend Node dedicado compatible
+  con Express. Railway queda como fallback solo si se reactiva; el camino
+  vigente usa Render como puente operativo mientras se valida Vercel Functions
+  sin sacrificar funcionalidad.
 - Automatizacion: n8n.
 - WhatsApp: Evolution API self-host solo si no implica costo de servicio; `wa.me`
   queda como fallback manual.

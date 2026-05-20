@@ -2,20 +2,26 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { normalizePhone } from '../services/evolutionApi';
 import { correlateIncomingWhatsAppPaymentConfirmation } from '../services/paymentDetection';
+import { DEFAULT_ORGANIZATION_ID } from '../lib/tenant';
 import axios from 'axios';
 
 const router = Router();
 
 const WEBHOOK_SECRET = process.env.EVOLUTION_WEBHOOK_SECRET || '';
+const WEBHOOK_ORGANIZATION_ID = process.env.EVOLUTION_WEBHOOK_ORGANIZATION_ID || '';
 const PAYMENT_DETECTION_WEBHOOK_URL = process.env.PAYMENT_DETECTION_WEBHOOK_URL || '';
 const PAYMENT_DETECTION_WEBHOOK_TOKEN = process.env.PAYMENT_DETECTION_WEBHOOK_TOKEN || '';
 
 let warnedEmptySecret = false;
 function verifyWebhookSecret(req: Request, res: Response, next: import('express').NextFunction) {
   if (!WEBHOOK_SECRET) {
-    if (!warnedEmptySecret && process.env.NODE_ENV === 'production') {
-      warnedEmptySecret = true;
-      console.warn('[webhooks] WARNING: WEBHOOK_SECRET vacio en produccion');
+    if (process.env.NODE_ENV === 'production') {
+      if (!warnedEmptySecret) {
+        warnedEmptySecret = true;
+        console.warn('[webhooks] WEBHOOK_SECRET vacio en produccion; webhook bloqueado');
+      }
+      res.status(503).json({ error: 'Webhook secret no configurado' });
+      return;
     }
     next();
     return;
@@ -28,12 +34,27 @@ function verifyWebhookSecret(req: Request, res: Response, next: import('express'
   next();
 }
 
+function resolveWebhookOrganizationId(res: Response): string | null {
+  if (WEBHOOK_ORGANIZATION_ID) {
+    return WEBHOOK_ORGANIZATION_ID;
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    res.status(503).json({ error: 'Webhook organization no configurado' });
+    return null;
+  }
+
+  return DEFAULT_ORGANIZATION_ID;
+}
+
 // POST /api/webhooks/evolution
 // Receives incoming messages from Evolution API
 router.post('/evolution', verifyWebhookSecret, async (req: Request, res: Response) => {
   try {
     const payload = req.body;
     const event = payload.event;
+    const organizationId = resolveWebhookOrganizationId(res);
+    if (!organizationId) return;
 
     // Only process incoming messages
     if (event !== 'messages.upsert') {
@@ -58,7 +79,7 @@ router.post('/evolution', verifyWebhookSecret, async (req: Request, res: Respons
     const evolutionId = message.key?.id || null;
     if (evolutionId) {
       const existing = await prisma.whatsAppMessage.findFirst({
-        where: { evolutionMsgId: evolutionId, direction: 'INCOMING' },
+        where: { organizationId, evolutionMsgId: evolutionId, direction: 'INCOMING' },
         select: { id: true },
       });
       if (existing) {
@@ -90,12 +111,14 @@ router.post('/evolution', verifyWebhookSecret, async (req: Request, res: Respons
     const normalizedPhone = normalizePhone(phone);
     const client = await prisma.client.findFirst({
       where: {
+        organizationId,
         telefono: { contains: phone.slice(-10) },
       },
     });
 
     const incomingMessageRow = await prisma.whatsAppMessage.create({
       data: {
+        organizationId,
         clientId: client?.id || null,
         direction: 'INCOMING',
         messageType,
@@ -110,6 +133,7 @@ router.post('/evolution', verifyWebhookSecret, async (req: Request, res: Respons
     // Log the incoming message
     await prisma.logEntry.create({
       data: {
+        organizationId,
         clientId: client?.id || null,
         tipo: 'INCOMING',
         variante: messageType,
@@ -125,6 +149,7 @@ router.post('/evolution', verifyWebhookSecret, async (req: Request, res: Respons
         phone: normalizedPhone,
         text: content,
         sourceMessageId: message.key?.id || null,
+        organizationId,
       })
       : null;
 

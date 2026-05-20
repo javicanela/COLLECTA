@@ -3,6 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import * as evolutionApi from '../services/evolutionApi';
+import { requireOrg } from '../lib/tenant';
 
 const router = Router();
 
@@ -51,9 +52,9 @@ function validateBody<T>(schema: z.ZodSchema<T>) {
   };
 }
 
-async function findClientForSend(clientId: string | undefined, phone: string) {
+async function findClientForSend(organizationId: string, clientId: string | undefined, phone: string) {
   if (clientId) {
-    return prisma.client.findUnique({ where: { id: clientId } });
+    return prisma.client.findFirst({ where: { id: clientId, organizationId } });
   }
 
   const digits = phone.replace(/\D/g, '');
@@ -62,12 +63,14 @@ async function findClientForSend(clientId: string | undefined, phone: string) {
 
   return prisma.client.findFirst({
     where: {
+      organizationId,
       telefono: { contains: last10 },
     },
   });
 }
 
 async function recordOutboundAttempt(params: {
+  organizationId: string;
   clientId?: string | null;
   operationId?: string | null;
   phone: string;
@@ -81,6 +84,7 @@ async function recordOutboundAttempt(params: {
 }) {
   await prisma.whatsAppMessage.create({
     data: {
+      organizationId: params.organizationId,
       clientId: params.clientId || null,
       operationId: params.operationId || null,
       direction: 'OUTGOING',
@@ -96,6 +100,7 @@ async function recordOutboundAttempt(params: {
   const mediaPrefix = params.mediaUrl ? `[${params.messageType}] ` : '';
   await prisma.logEntry.create({
     data: {
+      organizationId: params.organizationId,
       clientId: params.clientId || null,
       tipo: 'WHATSAPP',
       variante: params.logVariant,
@@ -109,6 +114,7 @@ async function recordOutboundAttempt(params: {
 
 async function rejectSuspendedClientIfNeeded(params: {
   res: Response;
+  organizationId: string;
   phone: string;
   clientId?: string;
   operationId?: string;
@@ -118,12 +124,13 @@ async function rejectSuspendedClientIfNeeded(params: {
   messageType: 'TEXT' | 'IMAGE' | 'DOCUMENT';
   logVariant: 'INDIVIDUAL' | 'MEDIA';
 }) {
-  const client = await findClientForSend(params.clientId, params.phone);
+  const client = await findClientForSend(params.organizationId, params.clientId, params.phone);
   if (client?.estado !== 'SUSPENDIDO' || params.overrideSuspendedClient) {
     return false;
   }
 
   await recordOutboundAttempt({
+    organizationId: params.organizationId,
     clientId: client.id,
     operationId: params.operationId || null,
     phone: params.phone,
@@ -164,10 +171,12 @@ router.get('/status', async (_req: Request, res: Response) => {
 
 router.post('/send', outboundLimiter, validateBody(sendTextSchema), async (req: Request, res: Response) => {
   const { phone, text, clientId, operationId, overrideSuspendedClient } = req.body;
+  const organizationId = requireOrg(req);
 
   try {
     const blocked = await rejectSuspendedClientIfNeeded({
       res,
+      organizationId,
       phone,
       clientId,
       operationId,
@@ -180,6 +189,7 @@ router.post('/send', outboundLimiter, validateBody(sendTextSchema), async (req: 
 
     if (!evolutionApi.isConfigured()) {
       await recordOutboundAttempt({
+        organizationId,
         clientId,
         operationId,
         phone,
@@ -196,6 +206,7 @@ router.post('/send', outboundLimiter, validateBody(sendTextSchema), async (req: 
     const result = await evolutionApi.sendTextMessage(phone, text);
 
     await recordOutboundAttempt({
+      organizationId,
       clientId,
       operationId,
       phone,
@@ -219,12 +230,14 @@ router.post('/send', outboundLimiter, validateBody(sendTextSchema), async (req: 
 
 router.post('/send-media', outboundLimiter, validateBody(sendMediaSchema), async (req: Request, res: Response) => {
   const { phone, mediaUrl, caption, mediaType, fileName, clientId, operationId, overrideSuspendedClient } = req.body;
+  const organizationId = requireOrg(req);
   const messageType = mediaType === 'image' ? 'IMAGE' : 'DOCUMENT';
   const content = caption || fileName || null;
 
   try {
     const blocked = await rejectSuspendedClientIfNeeded({
       res,
+      organizationId,
       phone,
       clientId,
       operationId,
@@ -238,6 +251,7 @@ router.post('/send-media', outboundLimiter, validateBody(sendMediaSchema), async
 
     if (!evolutionApi.isConfigured()) {
       await recordOutboundAttempt({
+        organizationId,
         clientId,
         operationId,
         phone,
@@ -255,6 +269,7 @@ router.post('/send-media', outboundLimiter, validateBody(sendMediaSchema), async
     const result = await evolutionApi.sendMediaMessage(phone, mediaUrl, caption, mediaType, fileName);
 
     await recordOutboundAttempt({
+      organizationId,
       clientId,
       operationId,
       phone,

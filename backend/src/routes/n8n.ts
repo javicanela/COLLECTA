@@ -6,6 +6,7 @@ import {
   PAYMENT_DETECTION_LOG_TYPE,
   type PaymentDetectionResult,
 } from '../services/paymentDetection';
+import { DEFAULT_ORGANIZATION_ID } from '../lib/tenant';
 
 const router = Router();
 
@@ -82,13 +83,52 @@ function parseDetectionPayload(message?: string | null) {
   }
 }
 
+function normalizeOrganizationHeader(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return value[0]?.trim();
+  return value?.trim();
+}
+
+function isSafeOrganizationId(value: string) {
+  return /^[a-zA-Z0-9_-]{1,128}$/.test(value);
+}
+
+function resolveAutomationOrganizationId(req: Request, res: Response): string | null {
+  if (req.user?.organizationId) {
+    return req.user.organizationId;
+  }
+
+  const configured =
+    normalizeOrganizationHeader(req.headers['x-collecta-organization-id']) ||
+    normalizeOrganizationHeader(req.headers['x-organization-id']) ||
+    process.env.AUTOMATION_ORGANIZATION_ID?.trim() ||
+    process.env.N8N_ORGANIZATION_ID?.trim();
+
+  if (configured) {
+    if (!isSafeOrganizationId(configured)) {
+      res.status(400).json({ error: 'organization_id_invalid' });
+      return null;
+    }
+    return configured;
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    res.status(400).json({ error: 'automation_organization_required' });
+    return null;
+  }
+
+  return DEFAULT_ORGANIZATION_ID;
+}
+
 /**
  * GET /api/n8n/daily-report
  * Endpoint enriquecido para el workflow n8n de reporte diario.
  * Devuelve stats completas + top deudores + operaciones críticas + desglose por asesor.
  */
-router.get('/daily-report', async (_req: Request, res: Response) => {
+router.get('/daily-report', async (req: Request, res: Response) => {
   try {
+    const organizationId = resolveAutomationOrganizationId(req, res);
+    if (!organizationId) return;
+
     const today = new Date();
     const todayStr = today.toLocaleDateString('es-MX', { 
       weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' 
@@ -96,7 +136,7 @@ router.get('/daily-report', async (_req: Request, res: Response) => {
 
     // All active (non-archived) operations
     const allOps = await prisma.operation.findMany({
-      where: { archived: false },
+      where: { organizationId, archived: false },
       include: { client: true },
       orderBy: { fechaVence: 'asc' },
     });
@@ -194,7 +234,7 @@ router.get('/daily-report', async (_req: Request, res: Response) => {
     }));
 
     // Config for the report header
-    const configRows = await prisma.config.findMany();
+    const configRows = await prisma.config.findMany({ where: { organizationId } });
     const cfg: Record<string, string> = {};
     for (const row of configRows) {
       cfg[row.key] = row.value;
@@ -272,6 +312,9 @@ router.get('/daily-report', async (_req: Request, res: Response) => {
  */
 router.post('/webhook/payment-confirmed', async (req: Request, res: Response) => {
   try {
+    const organizationId = resolveAutomationOrganizationId(req, res);
+    if (!organizationId) return;
+
     const parsed = paymentEvidenceSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({
@@ -286,7 +329,7 @@ router.post('/webhook/payment-confirmed', async (req: Request, res: Response) =>
       return res.status(400).json({ error: 'rfc y monto son requeridos' });
     }
 
-    const result = await detectPaymentFromEvidence(prisma, evidence);
+    const result = await detectPaymentFromEvidence(prisma, evidence, organizationId);
 
     res.json(toPaymentResponse(result));
   } catch (error) {
@@ -301,6 +344,9 @@ router.post('/webhook/payment-confirmed', async (req: Request, res: Response) =>
  */
 router.post('/payment-detections', async (req: Request, res: Response) => {
   try {
+    const organizationId = resolveAutomationOrganizationId(req, res);
+    if (!organizationId) return;
+
     const parsed = paymentEvidenceSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({
@@ -315,7 +361,7 @@ router.post('/payment-detections', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'rfc y monto son requeridos' });
     }
 
-    const result = await detectPaymentFromEvidence(prisma, evidence);
+    const result = await detectPaymentFromEvidence(prisma, evidence, organizationId);
 
     res.json(toPaymentResponse(result));
   } catch (error) {
@@ -328,10 +374,14 @@ router.post('/payment-detections', async (req: Request, res: Response) => {
  * GET /api/n8n/payment-review
  * Report for detections that require manual confirmation.
  */
-router.get('/payment-review', async (_req: Request, res: Response) => {
+router.get('/payment-review', async (req: Request, res: Response) => {
   try {
+    const organizationId = resolveAutomationOrganizationId(req, res);
+    if (!organizationId) return;
+
     const logs = await prisma.logEntry.findMany({
       where: {
+        organizationId,
         tipo: PAYMENT_DETECTION_LOG_TYPE,
         resultado: 'REVIEW_REQUIRED',
       },
@@ -350,6 +400,7 @@ router.get('/payment-review', async (_req: Request, res: Response) => {
       const candidates = clientId
         ? await prisma.operation.findMany({
           where: {
+            organizationId,
             clientId,
             fechaPago: null,
             excluir: false,
@@ -395,6 +446,9 @@ router.get('/payment-review', async (_req: Request, res: Response) => {
  */
 router.post('/payment-review/confirm', async (req: Request, res: Response) => {
   try {
+    const organizationId = resolveAutomationOrganizationId(req, res);
+    if (!organizationId) return;
+
     const parsed = manualConfirmSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({
@@ -403,8 +457,8 @@ router.post('/payment-review/confirm', async (req: Request, res: Response) => {
       });
     }
 
-    const operation = await prisma.operation.findUnique({
-      where: { id: parsed.data.operationId },
+    const operation = await prisma.operation.findFirst({
+      where: { id: parsed.data.operationId, organizationId },
       include: { client: true },
     });
 
@@ -428,6 +482,7 @@ router.post('/payment-review/confirm', async (req: Request, res: Response) => {
     await prisma.logEntry.create({
       data: {
         clientId: operation.clientId,
+        organizationId,
         tipo: PAYMENT_DETECTION_LOG_TYPE,
         variante: 'MANUAL_REVIEW',
         resultado: 'MANUALLY_CONFIRMED',
@@ -467,11 +522,15 @@ router.post('/payment-review/confirm', async (req: Request, res: Response) => {
  * Returns operations that need collection action today.
  * Used by n8n to trigger WhatsApp/Email sends.
  */
-router.get('/pending-collections', async (_req: Request, res: Response) => {
+router.get('/pending-collections', async (req: Request, res: Response) => {
   try {
+    const organizationId = resolveAutomationOrganizationId(req, res);
+    if (!organizationId) return;
+
     const today = new Date();
     const ops = await prisma.operation.findMany({
       where: {
+        organizationId,
         archived: false,
         fechaPago: null,
         excluir: false,
@@ -481,7 +540,7 @@ router.get('/pending-collections', async (_req: Request, res: Response) => {
     });
 
     // Config for message templates
-    const configRows = await prisma.config.findMany();
+    const configRows = await prisma.config.findMany({ where: { organizationId } });
     const cfg: Record<string, string> = {};
     for (const row of configRows) {
       cfg[row.key] = row.value;

@@ -4,6 +4,7 @@ import { logger } from '../lib/logger';
 import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
 import { organizationScopedConfigKey, requireOrg } from '../lib/tenant';
+import { requireAdminConfirm } from '../middleware/auth';
 
 // Solo purge y restore son verdaderamente destructivos
 const destructiveLimiter = rateLimit({
@@ -145,7 +146,7 @@ router.get('/backup', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/restore', destructiveLimiter, validateBody(restoreSchema), async (req: Request, res: Response) => {
+router.post('/restore', destructiveLimiter, requireAdminConfirm, validateBody(restoreSchema), async (req: Request, res: Response) => {
   try {
     const organizationId = requireOrg(req);
     const { clients, operations, logs, config } = req.body.data;
@@ -185,7 +186,7 @@ router.post('/restore', destructiveLimiter, validateBody(restoreSchema), async (
   }
 });
 
-router.post('/purge', destructiveLimiter, validateBody(purgeSchema), async (req: Request, res: Response) => {
+router.post('/purge', destructiveLimiter, requireAdminConfirm, validateBody(purgeSchema), async (req: Request, res: Response) => {
   try {
     const organizationId = requireOrg(req);
     const { type } = req.body;

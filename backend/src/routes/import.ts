@@ -7,6 +7,7 @@ import { commitSmartImportRows } from '../services/smartImport/commit';
 import { analyzeWithByokProvider } from '../services/smartImport/provider-proxy';
 import { parseBufferToSheets } from '../services/smartImport/extract-server';
 import { smartImportAnalyzeSchema, smartImportCommitSchema } from '../services/smartImport/schemas';
+import { requireOrg } from '../lib/tenant';
 import multer from 'multer';
 
 const router = Router();
@@ -46,7 +47,7 @@ router.post('/analyze', validateBody(smartImportAnalyzeSchema), async (req: Requ
 
 router.post('/commit', validateBody(smartImportCommitSchema), async (req: Request, res: Response) => {
   try {
-    const result = await commitSmartImportRows(req.body);
+    const result = await commitSmartImportRows(req.body, undefined, requireOrg(req));
     res.json(result);
   } catch (error: any) {
     res.status(500).json({ error: 'Smart import commit failed', details: error.message });

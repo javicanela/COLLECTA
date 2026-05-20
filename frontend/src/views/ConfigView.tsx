@@ -20,7 +20,7 @@ import { PlantillaModal } from '../components/modals/PlantillaModal';
 // ─── Dummy data for PDF preview ──────────────────────────────────────────────
 const DUMMY_CLIENT = {
   id: 'preview', rfc: 'XAXX010101000', nombre: 'Colegio de Anestesiologos',
-  estado: 'ACTIVO' as const, regimen: 'Persona Moral', asesor: 'ASESOR DEMO',
+  estado: 'ACTIVO' as const, regimen: 'Persona Moral', asesor: 'ASESOR PRUEBA',
   createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
 };
 const DUMMY_OPS: Operation[] = [

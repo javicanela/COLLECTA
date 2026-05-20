@@ -217,7 +217,9 @@ export const ExportService = {
       const text = await backupFile.text();
       const parsed = JSON.parse(text);
       if (!parsed.data) throw new Error('Formato de backup invalido');
-      await api.post('/config/restore', { data: parsed.data });
+      await api.post('/config/restore', { data: parsed.data }, {
+        headers: { 'X-Admin-Confirm': 'yes-delete-all' },
+      });
     } catch (error) {
       console.error('Error restoring backup:', error);
       throw error;
@@ -226,7 +228,9 @@ export const ExportService = {
 
   async purgeData(type: 'all' | 'logs' | 'staging') {
     try {
-      await api.post('/config/purge', { type });
+      await api.post('/config/purge', { type }, {
+        headers: { 'X-Admin-Confirm': 'yes-delete-all' },
+      });
     } catch (error) {
       console.error('Error purging data:', error);
       throw error;

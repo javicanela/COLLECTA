@@ -9,8 +9,9 @@ archivos contables.
 | Area | Tecnologia | Target |
 |---|---|---|
 | Frontend | React 19 + TypeScript + Vite + TailwindCSS | Vercel |
-| Backend | Express 5 + TypeScript + Prisma | Railway |
-| Base de datos | PostgreSQL / Neon | Neon |
+| Backend | Express 5 + TypeScript + Prisma | Render como puente; Vercel Functions solo tras validacion |
+| Base de datos | PostgreSQL / Supabase | Supabase |
+| Storage | Supabase Storage privado | PDFs/adjuntos temporales |
 | Automatizacion | n8n | self-host o cloud |
 | WhatsApp | Evolution API self-host si no implica costo de servicio; wa.me como fallback manual | opcional |
 | Smart Import | SheetJS + PapaParse + motor determinista; WebLLM/Transformers.js/Ollama/BYOK como escalamiento obligatorio si estan disponibles | provider-agnostic |
@@ -91,11 +92,26 @@ npm run test:full
 - `DIRECT_URL`
 - `JWT_SECRET`
 - `API_KEY`
+- `AUTOMATION_ORGANIZATION_ID`
+- `N8N_ORGANIZATION_ID`
 - `ALLOWED_ORIGINS`
+- `BACKEND_PUBLIC_URL`
+- `TEMP_PDF_STORAGE_PROVIDER`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_STORAGE_BUCKET`
+- `SUPABASE_JWT_SECRET`
+- `SUPABASE_JWKS_URL`
 - `EVOLUTION_API_URL`
 - `EVOLUTION_INSTANCE`
 - `EVOLUTION_API_KEY`
 - `EVOLUTION_WEBHOOK_SECRET`
+- `EVOLUTION_WEBHOOK_ORGANIZATION_ID`
+- `PAYMENT_DETECTION_WEBHOOK_URL`
+- `PAYMENT_DETECTION_WEBHOOK_TOKEN`
+- `EMAIL_PROVIDER`
+- `RESEND_API_KEY`
+- `EMAIL_FROM`
 - `GEMINI_API_KEY`
 - `GROQ_API_KEY`
 - `OPENROUTER_API_KEY`
@@ -111,8 +127,8 @@ proveedor externo en requisito.
 - `docs/PLAN_DEFINITIVO_COLLECTA.md`: plan maestro.
 - `docs/README.md`: indice de documentacion.
 - `docs/runbooks/README.md`: instalacion, QA, secretos, plataformas y handoff.
-- `docs/runbooks/ABRE_FACIL_VERSION_FINAL.md`: setup abre-facil, PWA y flujo
-  operativo para despacho.
+- `docs/runbooks/COLLECTA_SAAS_WEB.md`: setup de Collecta SaaS web,
+  PWA y flujo operativo para despacho.
 - `docs/checklists/IMPLEMENTACION_DESPACHO_FINAL.md`: checklist final de
   aceptacion operativa.
 - `docs/specs/`: especificaciones vigentes.

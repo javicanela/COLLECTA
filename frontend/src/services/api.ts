@@ -4,9 +4,8 @@
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL ||
   (import.meta.env.PROD
-    ? 'https://collecta-production.up.railway.app/api'
+    ? '/api'
     : 'http://localhost:3001/api');
-const API_KEY = import.meta.env.VITE_API_KEY || '';
 
 function getAuthToken(): string | null {
   try {
@@ -21,15 +20,10 @@ function getAuthToken(): string | null {
  */
 async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
-  const authHeader = token
-    ? `Bearer ${token}`
-    : API_KEY
-      ? `Bearer ${API_KEY}`
-      : '';
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(authHeader && { 'Authorization': authHeader }),
+    ...(token && { 'Authorization': `Bearer ${token}` }),
   };
 
   if (options.headers) {
@@ -83,7 +77,7 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
  */
 export const api = {
   get: <T>(endpoint: string) => apiRequest<T>(endpoint),
-  post: <T>(endpoint: string, body: unknown = {}) => apiRequest<T>(endpoint, { method: 'POST', body: JSON.stringify(body) }),
+  post: <T>(endpoint: string, body: unknown = {}, options: RequestInit = {}) => apiRequest<T>(endpoint, { ...options, method: 'POST', body: JSON.stringify(body) }),
   put: <T>(endpoint: string, body: unknown) => apiRequest<T>(endpoint, { method: 'PUT', body: JSON.stringify(body) }),
   patch: <T>(endpoint: string, body: unknown = {}) => apiRequest<T>(endpoint, { method: 'PATCH', body: JSON.stringify(body) }),
   del: <T>(endpoint: string) => apiRequest<T>(endpoint, { method: 'DELETE' }),

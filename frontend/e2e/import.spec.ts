@@ -1,21 +1,15 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createLoggedInSaasAccount } from './helpers/auth';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const API_BASE = 'http://localhost:3001/api';
-const ADMIN_USER = process.env.ADMIN_USER || 'admin';
-const ADMIN_PASS = process.env.ADMIN_PASS || 'test-admin-password';
 const FIXTURE_PATH = path.resolve(__dirname, 'fixtures', '3-clientes.csv');
 
 async function loginViaApi(request: APIRequestContext): Promise<string> {
-  const res = await request.post(`${API_BASE}/auth/login`, {
-    data: { email: ADMIN_USER, password: ADMIN_PASS },
-  });
-  expect(res.status()).toBe(200);
-  const body = await res.json() as { token: string };
-  return body.token as string;
+  const { token } = await createLoggedInSaasAccount(request, 'import');
+  return token;
 }
 
 test.describe('Smart Import flow', () => {
@@ -27,9 +21,8 @@ test.describe('Smart Import flow', () => {
     }, token);
     await page.goto('/registros');
 
-    await expect(page.getByText(/importar datos|smart import|sube tu archivo/i).or(
-      page.locator('[class*="dropzone"]'),
-    )).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /importar datos/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /smart import/i })).toBeVisible();
   });
 
   test('uploads a CSV fixture and reaches review phase', async ({ page, request }) => {

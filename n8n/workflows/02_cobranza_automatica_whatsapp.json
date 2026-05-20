@@ -1,310 +1,429 @@
 {
-  "name": "Collecta — Cobranza Automática WhatsApp",
-  "nodes": [
-    {
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "triggerAtHour": 9,
-              "triggerAtMinute": 30
-            }
-          ]
-        }
-      },
-      "id": "cron-cobranza",
-      "name": "⏰ Cada día 9:30 AM",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [220, 300]
-    },
-    {
-      "parameters": {
-        "url": "={{$env.COLLECTA_API_URL || 'http://localhost:3001'}}/api/n8n/pending-collections",
-        "authentication": "none",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$env.API_KEY}}"
-            }
-          ]
-        },
-        "options": {
-          "timeout": 15000
-        }
-      },
-      "id": "http-pending",
-      "name": "📋 Obtener Pendientes",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [440, 300]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "check-total",
-              "leftValue": "={{ $json.total }}",
-              "rightValue": "0",
-              "operator": {
-                "type": "number",
-                "operation": "gt"
-              }
-            }
-          ],
-          "combinator": "and"
-        }
-      },
-      "id": "if-has-pending",
-      "name": "🔍 ¿Hay pendientes?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [660, 300]
-    },
-    {
-      "parameters": {
-        "fieldToSplitOut": "collections",
-        "options": {}
-      },
-      "id": "split-collections",
-      "name": "📤 Separar operaciones",
-      "type": "n8n-nodes-base.splitOut",
-      "typeVersion": 1,
-      "position": [880, 200]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "check-telefono",
-              "leftValue": "={{ $json.clienteTelefono }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "isNotEmpty"
-              }
-            }
-          ],
-          "combinator": "and"
-        }
-      },
-      "id": "if-has-phone",
-      "name": "📱 ¿Tiene teléfono?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [1100, 200]
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "phone-clean",
-              "name": "phoneClean",
-              "value": "={{ $json.clienteTelefono.replace(/\\D/g, '').replace(/^(?!52)/, '52') }}",
-              "type": "string"
-            },
-            {
-              "id": "wa-message",
-              "name": "waMessage",
-              "value": "={{ $json.mensajeWhatsApp }}",
-              "type": "string"
-            }
-          ]
-        }
-      },
-      "id": "prepare-wa",
-      "name": "🔧 Preparar mensaje WA",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [1320, 120]
-    },
-    {
-      "parameters": {
-        "url": "={{$env.EVOLUTION_API_URL}}/message/sendText/{{$env.EVOLUTION_INSTANCE}}",
-        "authentication": "none",
-        "method": "POST",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "apikey",
-              "value": "={{$env.EVOLUTION_API_KEY}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"number\": \"{{ $json.phoneClean }}\",\n  \"text\": \"{{ $json.waMessage }}\"\n}",
-        "options": {
-          "timeout": 10000
-        }
-      },
-      "id": "evolution-send",
-      "name": "💬 Enviar WhatsApp (Evolution)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1540, 120],
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "amount": 2,
-        "unit": "seconds"
-      },
-      "id": "wait-between",
-      "name": "⏳ Esperar 2s",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [1760, 120]
-    },
-    {
-      "parameters": {
-        "url": "={{$env.COLLECTA_API_URL || 'http://localhost:3001'}}/api/logs",
-        "authentication": "none",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$env.API_KEY}}"
-            }
-          ]
-        },
-        "method": "POST",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"clientId\": \"{{ $('📤 Separar operaciones').item.json.clientId }}\",\n  \"tipo\": \"WHATSAPP\",\n  \"variante\": \"{{ $('📤 Separar operaciones').item.json.status }}\",\n  \"resultado\": \"ENVIADO\",\n  \"mensaje\": \"{{ $('📤 Separar operaciones').item.json.mensajeWhatsApp.substring(0, 200) }}\",\n  \"telefono\": \"{{ $('📤 Separar operaciones').item.json.clienteTelefono }}\",\n  \"modo\": \"PRODUCCIÓN\"\n}",
-        "options": {}
-      },
-      "id": "log-wa-send",
-      "name": "📝 Log envío WA",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1980, 120]
-    },
-    {
-      "parameters": {
-        "url": "={{$env.COLLECTA_API_URL || 'http://localhost:3001'}}/api/logs",
-        "authentication": "none",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$env.API_KEY}}"
-            }
-          ]
-        },
-        "method": "POST",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"clientId\": \"{{ $json.clientId }}\",\n  \"tipo\": \"WHATSAPP\",\n  \"variante\": \"{{ $json.status }}\",\n  \"resultado\": \"ERROR\",\n  \"mensaje\": \"Sin teléfono registrado para {{ $json.clienteNombre }}\",\n  \"modo\": \"PRODUCCIÓN\"\n}",
-        "options": {}
-      },
-      "id": "log-no-phone",
-      "name": "⚠️ Log sin teléfono",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1320, 320]
-    },
-    {
-      "parameters": {
-        "url": "https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
-        "authentication": "none",
-        "method": "POST",
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "chat_id",
-              "value": "={{$env.TELEGRAM_CHAT_ID}}"
-            },
-            {
-              "name": "text",
-              "value": "📭 No hay operaciones pendientes de cobro hoy. ¡Buen día!"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "telegram-nothing",
-      "name": "✅ Nada que cobrar",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [880, 420]
-    }
-  ],
-  "connections": {
-    "⏰ Cada día 9:30 AM": {
-      "main": [
-        [{ "node": "📋 Obtener Pendientes", "type": "main", "index": 0 }]
-      ]
-    },
-    "📋 Obtener Pendientes": {
-      "main": [
-        [{ "node": "🔍 ¿Hay pendientes?", "type": "main", "index": 0 }]
-      ]
-    },
-    "🔍 ¿Hay pendientes?": {
-      "main": [
-        [{ "node": "📤 Separar operaciones", "type": "main", "index": 0 }],
-        [{ "node": "✅ Nada que cobrar", "type": "main", "index": 0 }]
-      ]
-    },
-    "📤 Separar operaciones": {
-      "main": [
-        [{ "node": "📱 ¿Tiene teléfono?", "type": "main", "index": 0 }]
-      ]
-    },
-    "📱 ¿Tiene teléfono?": {
-      "main": [
-        [{ "node": "🔧 Preparar mensaje WA", "type": "main", "index": 0 }],
-        [{ "node": "⚠️ Log sin teléfono", "type": "main", "index": 0 }]
-      ]
-    },
-    "🔧 Preparar mensaje WA": {
-      "main": [
-        [{ "node": "💬 Enviar WhatsApp (Evolution)", "type": "main", "index": 0 }]
-      ]
-    },
-    "💬 Enviar WhatsApp (Evolution)": {
-      "main": [
-        [{ "node": "⏳ Esperar 2s", "type": "main", "index": 0 }]
-      ]
-    },
-    "⏳ Esperar 2s": {
-      "main": [
-        [{ "node": "📝 Log envío WA", "type": "main", "index": 0 }]
-      ]
-    }
-  },
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "staticData": null,
-  "tags": [
-    { "name": "collecta" },
-    { "name": "cobranza" },
-    { "name": "whatsapp" }
-  ],
-  "triggerCount": 1
+    "name":  "Collecta â€” Cobranza AutomÃ¡tica WhatsApp",
+    "nodes":  [
+                  {
+                      "parameters":  {
+                                         "rule":  {
+                                                      "interval":  [
+                                                                       {
+                                                                           "triggerAtHour":  9,
+                                                                           "triggerAtMinute":  30
+                                                                       }
+                                                                   ]
+                                                  }
+                                     },
+                      "id":  "cron-cobranza",
+                      "name":  "â° Cada dÃ­a 9:30 AM",
+                      "type":  "n8n-nodes-base.scheduleTrigger",
+                      "typeVersion":  1.2,
+                      "position":  [
+                                       220,
+                                       300
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "={{$env.COLLECTA_API_URL || \u0027http://localhost:3001\u0027}}/api/n8n/pending-collections",
+                                         "authentication":  "none",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "Authorization",
+                                                                                         "value":  "=Bearer {{$env.API_KEY}}"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "X-Collecta-Organization-Id",
+                                                                                         "value":  "={{$env.COLLECTA_ORGANIZATION_ID || $env.N8N_ORGANIZATION_ID || \u0027default\u0027}}"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "options":  {
+                                                         "timeout":  15000
+                                                     }
+                                     },
+                      "id":  "http-pending",
+                      "name":  "ðŸ“‹ Obtener Pendientes",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       440,
+                                       300
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "strict"
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "check-total",
+                                                                                   "leftValue":  "={{ $json.total }}",
+                                                                                   "rightValue":  "0",
+                                                                                   "operator":  {
+                                                                                                    "type":  "number",
+                                                                                                    "operation":  "gt"
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        }
+                                     },
+                      "id":  "if-has-pending",
+                      "name":  "ðŸ” Â¿Hay pendientes?",
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2,
+                      "position":  [
+                                       660,
+                                       300
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "fieldToSplitOut":  "collections",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "split-collections",
+                      "name":  "ðŸ“¤ Separar operaciones",
+                      "type":  "n8n-nodes-base.splitOut",
+                      "typeVersion":  1,
+                      "position":  [
+                                       880,
+                                       200
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "strict"
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "check-telefono",
+                                                                                   "leftValue":  "={{ $json.clienteTelefono }}",
+                                                                                   "rightValue":  "",
+                                                                                   "operator":  {
+                                                                                                    "type":  "string",
+                                                                                                    "operation":  "isNotEmpty"
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        }
+                                     },
+                      "id":  "if-has-phone",
+                      "name":  "ðŸ“± Â¿Tiene telÃ©fono?",
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2,
+                      "position":  [
+                                       1100,
+                                       200
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "assignments":  {
+                                                             "assignments":  [
+                                                                                 {
+                                                                                     "id":  "phone-clean",
+                                                                                     "name":  "phoneClean",
+                                                                                     "value":  "={{ $json.clienteTelefono.replace(/\\D/g, \u0027\u0027).replace(/^(?!52)/, \u002752\u0027) }}",
+                                                                                     "type":  "string"
+                                                                                 },
+                                                                                 {
+                                                                                     "id":  "wa-message",
+                                                                                     "name":  "waMessage",
+                                                                                     "value":  "={{ $json.mensajeWhatsApp }}",
+                                                                                     "type":  "string"
+                                                                                 }
+                                                                             ]
+                                                         }
+                                     },
+                      "id":  "prepare-wa",
+                      "name":  "ðŸ”§ Preparar mensaje WA",
+                      "type":  "n8n-nodes-base.set",
+                      "typeVersion":  3.4,
+                      "position":  [
+                                       1320,
+                                       120
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "={{$env.EVOLUTION_API_URL}}/message/sendText/{{$env.EVOLUTION_INSTANCE}}",
+                                         "authentication":  "none",
+                                         "method":  "POST",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "apikey",
+                                                                                         "value":  "={{$env.EVOLUTION_API_KEY}}"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "Content-Type",
+                                                                                         "value":  "application/json"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={\n  \"number\": \"{{ $json.phoneClean }}\",\n  \"text\": \"{{ $json.waMessage }}\"\n}",
+                                         "options":  {
+                                                         "timeout":  10000
+                                                     }
+                                     },
+                      "id":  "evolution-send",
+                      "name":  "ðŸ’¬ Enviar WhatsApp (Evolution)",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       1540,
+                                       120
+                                   ],
+                      "onError":  "continueRegularOutput"
+                  },
+                  {
+                      "parameters":  {
+                                         "amount":  2,
+                                         "unit":  "seconds"
+                                     },
+                      "id":  "wait-between",
+                      "name":  "â³ Esperar 2s",
+                      "type":  "n8n-nodes-base.wait",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       1760,
+                                       120
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "={{$env.COLLECTA_API_URL || \u0027http://localhost:3001\u0027}}/api/logs",
+                                         "authentication":  "none",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "Authorization",
+                                                                                         "value":  "=Bearer {{$env.API_KEY}}"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "X-Collecta-Organization-Id",
+                                                                                         "value":  "={{$env.COLLECTA_ORGANIZATION_ID || $env.N8N_ORGANIZATION_ID || \u0027default\u0027}}"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "method":  "POST",
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={\n  \"clientId\": \"{{ $(\u0027ðŸ“¤ Separar operaciones\u0027).item.json.clientId }}\",\n  \"tipo\": \"WHATSAPP\",\n  \"variante\": \"{{ $(\u0027ðŸ“¤ Separar operaciones\u0027).item.json.status }}\",\n  \"resultado\": \"ENVIADO\",\n  \"mensaje\": \"{{ $(\u0027ðŸ“¤ Separar operaciones\u0027).item.json.mensajeWhatsApp.substring(0, 200) }}\",\n  \"telefono\": \"{{ $(\u0027ðŸ“¤ Separar operaciones\u0027).item.json.clienteTelefono }}\",\n  \"modo\": \"PRODUCCIÃ“N\"\n}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "log-wa-send",
+                      "name":  "ðŸ“ Log envÃ­o WA",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       1980,
+                                       120
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "={{$env.COLLECTA_API_URL || \u0027http://localhost:3001\u0027}}/api/logs",
+                                         "authentication":  "none",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "Authorization",
+                                                                                         "value":  "=Bearer {{$env.API_KEY}}"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "X-Collecta-Organization-Id",
+                                                                                         "value":  "={{$env.COLLECTA_ORGANIZATION_ID || $env.N8N_ORGANIZATION_ID || \u0027default\u0027}}"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "method":  "POST",
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={\n  \"clientId\": \"{{ $json.clientId }}\",\n  \"tipo\": \"WHATSAPP\",\n  \"variante\": \"{{ $json.status }}\",\n  \"resultado\": \"ERROR\",\n  \"mensaje\": \"Sin telÃ©fono registrado para {{ $json.clienteNombre }}\",\n  \"modo\": \"PRODUCCIÃ“N\"\n}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "log-no-phone",
+                      "name":  "âš ï¸ Log sin telÃ©fono",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       1320,
+                                       320
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
+                                         "authentication":  "none",
+                                         "method":  "POST",
+                                         "sendBody":  true,
+                                         "bodyParameters":  {
+                                                                "parameters":  [
+                                                                                   {
+                                                                                       "name":  "chat_id",
+                                                                                       "value":  "={{$env.TELEGRAM_CHAT_ID}}"
+                                                                                   },
+                                                                                   {
+                                                                                       "name":  "text",
+                                                                                       "value":  "ðŸ“­ No hay operaciones pendientes de cobro hoy. Â¡Buen dÃ­a!"
+                                                                                   }
+                                                                               ]
+                                                            },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "telegram-nothing",
+                      "name":  "âœ… Nada que cobrar",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       880,
+                                       420
+                                   ]
+                  }
+              ],
+    "connections":  {
+                        "â° Cada dÃ­a 9:30 AM":  {
+                                                      "main":  [
+                                                                   [
+                                                                       {
+                                                                           "node":  "ðŸ“‹ Obtener Pendientes",
+                                                                           "type":  "main",
+                                                                           "index":  0
+                                                                       }
+                                                                   ]
+                                                               ]
+                                                  },
+                        "ðŸ“‹ Obtener Pendientes":  {
+                                                        "main":  [
+                                                                     [
+                                                                         {
+                                                                             "node":  "ðŸ” Â¿Hay pendientes?",
+                                                                             "type":  "main",
+                                                                             "index":  0
+                                                                         }
+                                                                     ]
+                                                                 ]
+                                                    },
+                        "ðŸ” Â¿Hay pendientes?":  {
+                                                       "main":  [
+                                                                    [
+                                                                        {
+                                                                            "node":  "ðŸ“¤ Separar operaciones",
+                                                                            "type":  "main",
+                                                                            "index":  0
+                                                                        }
+                                                                    ],
+                                                                    [
+                                                                        {
+                                                                            "node":  "âœ… Nada que cobrar",
+                                                                            "type":  "main",
+                                                                            "index":  0
+                                                                        }
+                                                                    ]
+                                                                ]
+                                                   },
+                        "ðŸ“¤ Separar operaciones":  {
+                                                         "main":  [
+                                                                      [
+                                                                          {
+                                                                              "node":  "ðŸ“± Â¿Tiene telÃ©fono?",
+                                                                              "type":  "main",
+                                                                              "index":  0
+                                                                          }
+                                                                      ]
+                                                                  ]
+                                                     },
+                        "ðŸ“± Â¿Tiene telÃ©fono?":  {
+                                                        "main":  [
+                                                                     [
+                                                                         {
+                                                                             "node":  "ðŸ”§ Preparar mensaje WA",
+                                                                             "type":  "main",
+                                                                             "index":  0
+                                                                         }
+                                                                     ],
+                                                                     [
+                                                                         {
+                                                                             "node":  "âš ï¸ Log sin telÃ©fono",
+                                                                             "type":  "main",
+                                                                             "index":  0
+                                                                         }
+                                                                     ]
+                                                                 ]
+                                                    },
+                        "ðŸ”§ Preparar mensaje WA":  {
+                                                         "main":  [
+                                                                      [
+                                                                          {
+                                                                              "node":  "ðŸ’¬ Enviar WhatsApp (Evolution)",
+                                                                              "type":  "main",
+                                                                              "index":  0
+                                                                          }
+                                                                      ]
+                                                                  ]
+                                                     },
+                        "ðŸ’¬ Enviar WhatsApp (Evolution)":  {
+                                                                 "main":  [
+                                                                              [
+                                                                                  {
+                                                                                      "node":  "â³ Esperar 2s",
+                                                                                      "type":  "main",
+                                                                                      "index":  0
+                                                                                  }
+                                                                              ]
+                                                                          ]
+                                                             },
+                        "â³ Esperar 2s":  {
+                                               "main":  [
+                                                            [
+                                                                {
+                                                                    "node":  "ðŸ“ Log envÃ­o WA",
+                                                                    "type":  "main",
+                                                                    "index":  0
+                                                                }
+                                                            ]
+                                                        ]
+                                           }
+                    },
+    "settings":  {
+                     "executionOrder":  "v1"
+                 },
+    "staticData":  null,
+    "tags":  [
+                 {
+                     "name":  "collecta"
+                 },
+                 {
+                     "name":  "cobranza"
+                 },
+                 {
+                     "name":  "whatsapp"
+                 }
+             ],
+    "triggerCount":  1
 }

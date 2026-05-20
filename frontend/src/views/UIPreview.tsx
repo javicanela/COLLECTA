@@ -114,7 +114,7 @@ const UIPreview: React.FC = () => {
         title="Collecta Confirmation"
       >
         <div className="space-y-4">
-          <p className="text-text2">Are you sure you want to test the modal functionality? This is just for UI demonstration purposes.</p>
+          <p className="text-text2">Are you sure you want to open this component preview action?</p>
           <div className="flex gap-3 justify-end pt-4">
             <Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
             <Button variant="green" onClick={() => setIsModalOpen(false)}>Confirm Action</Button>

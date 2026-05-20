@@ -11,11 +11,11 @@ depender de memoria tribal ni servicios pagados.
   en escritorio y movil.
 - [Secrets and env safety](SECRETS_AND_ENV_SAFETY.md): que archivos no tocar,
   placeholders permitidos y politica de datos.
-- [Free platform options](FREE_PLATFORM_OPTIONS.md): opciones Vercel, Railway,
-  Neon, Supabase, Firebase, n8n y Evolution API con fallback local.
+- [Free platform options](FREE_PLATFORM_OPTIONS.md): opciones Vercel, Render,
+  Supabase, Neon, Firebase, n8n y Evolution API con fallback local.
 - [Operator handoff](OPERATOR_HANDOFF.md): guia corta para operar, verificar,
   leer logs y escalar login externo.
-- [Abre facil version final](ABRE_FACIL_VERSION_FINAL.md): setup, arranque,
+- [Collecta SaaS web publico](COLLECTA_SAAS_WEB.md): setup, arranque,
   PWA, offline y operacion diaria para despacho.
 
 ## Scripts locales

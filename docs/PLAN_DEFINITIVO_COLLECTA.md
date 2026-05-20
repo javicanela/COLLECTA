@@ -16,7 +16,7 @@ normalizados a Collecta con el menor trabajo manual posible.
 |---|---|---|---|
 | Frontend | Existe | `frontend/src/App.tsx` | Rutas dashboard, directorio, registros, exportar, agente, config y logs. |
 | Backend | Existe | `backend/src/index.ts` | Express 5 con helmet, rate limit, CORS y rutas protegidas. |
-| Base de datos | Existe | `backend/prisma/schema.prisma` | PostgreSQL / Neon es la DB oficial. |
+| Base de datos | Existe | `backend/prisma/schema.prisma` | PostgreSQL / Supabase es la DB oficial vigente. |
 | Auth | Existe | `backend/src/middleware/auth.ts` | JWT o `Authorization: Bearer <API_KEY>`. |
 | Clientes | Existe | `Client` y `backend/src/routes/clients.ts` | CRUD protegido por auth. |
 | Operaciones | Existe | `Operation` y `backend/src/routes/operations.ts` | Cobranza, pago, excluir y archivar. |
@@ -24,10 +24,10 @@ normalizados a Collecta con el menor trabajo manual posible.
 | WhatsApp | Parcial | `backend/src/routes/whatsapp.ts` | Evolution API wrapper existe; uso oficial depende de self-host sin costo de servicio. |
 | n8n | Parcial | `n8n/workflows/` | Workflows existen; deben usar auth Bearer para `/api/n8n/*`. |
 | Agente autonomo | Parcial | `AgentExecution`, `AgentAction`, `AgentConfig` | Modelos y endpoints existen; falta ejecucion completa validada. |
-| PDF | Parcial | `frontend/src/services/pdfService.tsx`, `backend/src/routes/cobranza.ts` | Frontend y backend generan PDF; envio WA requiere integracion posterior. |
+| PDF | Parcial | `frontend/src/services/pdfService.tsx`, `backend/src/routes/cobranza.ts`, `backend/src/services/tempFileStorage.ts` | Frontend y backend generan PDF; storage remoto usa Supabase Storage cuando esta configurado. |
 | Exportaciones | Existe | `frontend/src/views/ExportView.tsx` | Export XLSX/PDF desde frontend. |
 | Reporting | Parcial | Dashboard, export y n8n report | Falta monitoreo y reporting final de SaaS. |
-| Deploy | Parcial | `frontend/vercel.json`, `backend/railway.json`, docs | Vercel/Railway/Neon son el deploy oficial; no tocar secrets en git. |
+| Deploy | Parcial | `frontend/vercel.json`, `render.yaml`, `backend/railway.json`, docs | Vercel + Supabase + backend Node dedicado es el camino vigente; Railway queda como fallback reactivable. |
 
 ## 3. Lo que ya existe
 
@@ -62,9 +62,13 @@ normalizados a Collecta con el menor trabajo manual posible.
 
 ## 6. Decisiones tecnicas oficiales
 
-- PostgreSQL/Neon es la DB oficial.
+- PostgreSQL/Supabase es la DB oficial vigente.
 - Vercel es el host oficial del frontend publico.
-- Railway es el host oficial del backend Express.
+- El backend Express debe vivir en un runtime Node compatible. Render es el
+  puente operativo actual; Vercel Functions solo entra si no sacrifica PDFs,
+  Smart Import, webhooks, n8n, Evolution ni multi-tenant.
+- Supabase Storage privado es el storage oficial para PDFs/adjuntos temporales
+  en entornos remotos.
 - Prisma schema es la fuente de verdad del modelo.
 - `/api/n8n/*` requiere `Authorization: Bearer <API_KEY>` o JWT valido.
 - `/api/webhooks/evolution` usa `X-Webhook-Secret` si `EVOLUTION_WEBHOOK_SECRET`
@@ -166,8 +170,8 @@ Tareas:
 - Habilitar signup/login publico para despachos nuevos.
 - Auditar responsive real en iPhone 14 y Pixel 7.
 - Completar PWA instalable con iconos PNG reales.
-- Crear PostgreSQL gestionado en Neon.
-- Desplegar backend en Railway con migraciones Prisma y healthcheck.
+- Crear PostgreSQL gestionado y bucket privado en Supabase.
+- Desplegar backend Node/Express dedicado con migraciones Prisma y healthcheck.
 - Desplegar frontend en Vercel apuntando al backend publico.
 - Configurar `ALLOWED_ORIGINS` sin hardcodear secretos.
 - Validar aislamiento con dos despachos y prueba directa contra API.

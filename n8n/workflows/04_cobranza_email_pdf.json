@@ -1,236 +1,278 @@
 {
-  "name": "Collecta - Cobranza integrada con estado de cuenta PDF",
-  "nodes": [
-    {
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "triggerAtHour": 10,
-              "triggerAtMinute": 0
-            }
-          ]
-        }
-      },
-      "id": "cron-statement",
-      "name": "Cada dia 10:00 AM",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [220, 300]
-    },
-    {
-      "parameters": {
-        "url": "={{$env.COLLECTA_API_URL || 'http://localhost:3001'}}/api/n8n/pending-collections",
-        "authentication": "none",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$env.API_KEY}}"
-            }
-          ]
-        },
-        "options": {
-          "timeout": 15000
-        }
-      },
-      "id": "http-pending",
-      "name": "Obtener pendientes",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [440, 300]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "check-total",
-              "leftValue": "={{ $json.total }}",
-              "rightValue": "0",
-              "operator": {
-                "type": "number",
-                "operation": "gt"
-              }
-            }
-          ],
-          "combinator": "and"
-        }
-      },
-      "id": "if-has-pending",
-      "name": "Hay pendientes",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [660, 300]
-    },
-    {
-      "parameters": {
-        "fieldToSplitOut": "collections",
-        "options": {}
-      },
-      "id": "split-collections",
-      "name": "Separar operaciones",
-      "type": "n8n-nodes-base.splitOut",
-      "typeVersion": 1,
-      "position": [880, 200]
-    },
-    {
-      "parameters": {
-        "url": "={{$env.COLLECTA_API_URL || 'http://localhost:3001'}}/api/cobranza/cliente/{{ $json.clienteRfc }}/send-statement",
-        "authentication": "none",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$env.API_KEY}}"
-            }
-          ]
-        },
-        "method": "POST",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"channelPreference\":\"AUTO\"}",
-        "options": {
-          "timeout": 30000
-        }
-      },
-      "id": "send-statement",
-      "name": "Enviar estado de cuenta",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1100, 200]
-    },
-    {
-      "parameters": {},
-      "id": "noop-done",
-      "name": "Entrega gestionada por Collecta",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [1320, 200]
-    },
-    {
-      "parameters": {},
-      "id": "noop-nothing",
-      "name": "Nada que enviar",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [880, 420]
-    },
-    {
-      "parameters": {
-        "url": "={{$env.COLLECTA_API_URL || 'http://localhost:3001'}}/api/cobranza/cliente/{{ $json.clienteRfc }}/pdf",
-        "authentication": "none",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$env.API_KEY}}"
-            }
-          ]
-        },
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "file"
-            }
-          },
-          "timeout": 20000
-        }
-      },
-      "id": "manual-pdf-fallback",
-      "name": "Fallback manual - generar PDF",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1100, 420],
-      "disabled": true
-    }
-  ],
-  "connections": {
-    "Cada dia 10:00 AM": {
-      "main": [
-        [
-          {
-            "node": "Obtener pendientes",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Obtener pendientes": {
-      "main": [
-        [
-          {
-            "node": "Hay pendientes",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Hay pendientes": {
-      "main": [
-        [
-          {
-            "node": "Separar operaciones",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Nada que enviar",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Separar operaciones": {
-      "main": [
-        [
-          {
-            "node": "Enviar estado de cuenta",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Enviar estado de cuenta": {
-      "main": [
-        [
-          {
-            "node": "Entrega gestionada por Collecta",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
-  },
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "staticData": null,
-  "tags": [
-    {
-      "name": "collecta"
-    },
-    {
-      "name": "cobranza"
-    },
-    {
-      "name": "pdf"
-    }
-  ],
-  "triggerCount": 1
+    "name":  "Collecta - Cobranza integrada con estado de cuenta PDF",
+    "nodes":  [
+                  {
+                      "parameters":  {
+                                         "rule":  {
+                                                      "interval":  [
+                                                                       {
+                                                                           "triggerAtHour":  10,
+                                                                           "triggerAtMinute":  0
+                                                                       }
+                                                                   ]
+                                                  }
+                                     },
+                      "id":  "cron-statement",
+                      "name":  "Cada dia 10:00 AM",
+                      "type":  "n8n-nodes-base.scheduleTrigger",
+                      "typeVersion":  1.2,
+                      "position":  [
+                                       220,
+                                       300
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "={{$env.COLLECTA_API_URL || \u0027http://localhost:3001\u0027}}/api/n8n/pending-collections",
+                                         "authentication":  "none",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "Authorization",
+                                                                                         "value":  "=Bearer {{$env.API_KEY}}"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "X-Collecta-Organization-Id",
+                                                                                         "value":  "={{$env.COLLECTA_ORGANIZATION_ID || $env.N8N_ORGANIZATION_ID || \u0027default\u0027}}"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "options":  {
+                                                         "timeout":  15000
+                                                     }
+                                     },
+                      "id":  "http-pending",
+                      "name":  "Obtener pendientes",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       440,
+                                       300
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "strict"
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "check-total",
+                                                                                   "leftValue":  "={{ $json.total }}",
+                                                                                   "rightValue":  "0",
+                                                                                   "operator":  {
+                                                                                                    "type":  "number",
+                                                                                                    "operation":  "gt"
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        }
+                                     },
+                      "id":  "if-has-pending",
+                      "name":  "Hay pendientes",
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2,
+                      "position":  [
+                                       660,
+                                       300
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "fieldToSplitOut":  "collections",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "split-collections",
+                      "name":  "Separar operaciones",
+                      "type":  "n8n-nodes-base.splitOut",
+                      "typeVersion":  1,
+                      "position":  [
+                                       880,
+                                       200
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "={{$env.COLLECTA_API_URL || \u0027http://localhost:3001\u0027}}/api/cobranza/cliente/{{ $json.clienteRfc }}/send-statement",
+                                         "authentication":  "none",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "Authorization",
+                                                                                         "value":  "=Bearer {{$env.API_KEY}}"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "X-Collecta-Organization-Id",
+                                                                                         "value":  "={{$env.COLLECTA_ORGANIZATION_ID || $env.N8N_ORGANIZATION_ID || \u0027default\u0027}}"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "method":  "POST",
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={\"channelPreference\":\"AUTO\"}",
+                                         "options":  {
+                                                         "timeout":  30000
+                                                     }
+                                     },
+                      "id":  "send-statement",
+                      "name":  "Enviar estado de cuenta",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       1100,
+                                       200
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+
+                                     },
+                      "id":  "noop-done",
+                      "name":  "Entrega gestionada por Collecta",
+                      "type":  "n8n-nodes-base.noOp",
+                      "typeVersion":  1,
+                      "position":  [
+                                       1320,
+                                       200
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+
+                                     },
+                      "id":  "noop-nothing",
+                      "name":  "Nada que enviar",
+                      "type":  "n8n-nodes-base.noOp",
+                      "typeVersion":  1,
+                      "position":  [
+                                       880,
+                                       420
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "={{$env.COLLECTA_API_URL || \u0027http://localhost:3001\u0027}}/api/cobranza/cliente/{{ $json.clienteRfc }}/pdf",
+                                         "authentication":  "none",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "Authorization",
+                                                                                         "value":  "=Bearer {{$env.API_KEY}}"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "X-Collecta-Organization-Id",
+                                                                                         "value":  "={{$env.COLLECTA_ORGANIZATION_ID || $env.N8N_ORGANIZATION_ID || \u0027default\u0027}}"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "options":  {
+                                                         "response":  {
+                                                                          "response":  {
+                                                                                           "responseFormat":  "file"
+                                                                                       }
+                                                                      },
+                                                         "timeout":  20000
+                                                     }
+                                     },
+                      "id":  "manual-pdf-fallback",
+                      "name":  "Fallback manual - generar PDF",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       1100,
+                                       420
+                                   ],
+                      "disabled":  true
+                  }
+              ],
+    "connections":  {
+                        "Cada dia 10:00 AM":  {
+                                                  "main":  [
+                                                               [
+                                                                   {
+                                                                       "node":  "Obtener pendientes",
+                                                                       "type":  "main",
+                                                                       "index":  0
+                                                                   }
+                                                               ]
+                                                           ]
+                                              },
+                        "Obtener pendientes":  {
+                                                   "main":  [
+                                                                [
+                                                                    {
+                                                                        "node":  "Hay pendientes",
+                                                                        "type":  "main",
+                                                                        "index":  0
+                                                                    }
+                                                                ]
+                                                            ]
+                                               },
+                        "Hay pendientes":  {
+                                               "main":  [
+                                                            [
+                                                                {
+                                                                    "node":  "Separar operaciones",
+                                                                    "type":  "main",
+                                                                    "index":  0
+                                                                }
+                                                            ],
+                                                            [
+                                                                {
+                                                                    "node":  "Nada que enviar",
+                                                                    "type":  "main",
+                                                                    "index":  0
+                                                                }
+                                                            ]
+                                                        ]
+                                           },
+                        "Separar operaciones":  {
+                                                    "main":  [
+                                                                 [
+                                                                     {
+                                                                         "node":  "Enviar estado de cuenta",
+                                                                         "type":  "main",
+                                                                         "index":  0
+                                                                     }
+                                                                 ]
+                                                             ]
+                                                },
+                        "Enviar estado de cuenta":  {
+                                                        "main":  [
+                                                                     [
+                                                                         {
+                                                                             "node":  "Entrega gestionada por Collecta",
+                                                                             "type":  "main",
+                                                                             "index":  0
+                                                                         }
+                                                                     ]
+                                                                 ]
+                                                    }
+                    },
+    "settings":  {
+                     "executionOrder":  "v1"
+                 },
+    "staticData":  null,
+    "tags":  [
+                 {
+                     "name":  "collecta"
+                 },
+                 {
+                     "name":  "cobranza"
+                 },
+                 {
+                     "name":  "pdf"
+                 }
+             ],
+    "triggerCount":  1
 }

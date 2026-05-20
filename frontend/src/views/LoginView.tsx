@@ -7,7 +7,11 @@ import collectaMarkUrl from '../assets/collecta-mark.svg';
 
 export default function LoginView() {
   const login = useAuthStore((s) => s.login);
+  const signup = useAuthStore((s) => s.signup);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [organizationName, setOrganizationName] = useState('');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -16,6 +20,21 @@ export default function LoginView() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    if (mode === 'signup') {
+      if (!organizationName || !name || !email || !password) {
+        setError('Completa los datos de tu despacho y administrador.');
+        return;
+      }
+      if (password.length < 12) {
+        setError('La contrasena debe tener al menos 12 caracteres.');
+        return;
+      }
+      const ok = await signup({ organizationName, name, email, password });
+      if (!ok) {
+        setError('No pudimos crear la cuenta. Revisa los datos e intenta de nuevo.');
+      }
+      return;
+    }
     if (!email || !password) {
       setError('Ingresa tu usuario y contraseña.');
       return;
@@ -183,23 +202,90 @@ export default function LoginView() {
               </span>
             </div>
 
+            <div className="mb-6 grid grid-cols-2 gap-2 rounded-xl border border-white/10 bg-white/5 p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('login');
+                  setError('');
+                }}
+                className={`rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wider transition ${
+                  mode === 'login' ? 'bg-white text-[#11172f]' : 'text-white/60 hover:text-white'
+                }`}
+              >
+                Ingresar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('signup');
+                  setError('');
+                }}
+                className={`rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wider transition ${
+                  mode === 'signup' ? 'bg-white text-[#11172f]' : 'text-white/60 hover:text-white'
+                }`}
+              >
+                Crear cuenta
+              </button>
+            </div>
+
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-5">
+              {mode === 'signup' && (
+                <>
+                  <div>
+                    <label
+                      htmlFor="signup-organization"
+                      className="block text-[11px] font-semibold tracking-widest text-white/70 uppercase mb-2"
+                    >
+                      Despacho
+                    </label>
+                    <input
+                      id="signup-organization"
+                      type="text"
+                      value={organizationName}
+                      onChange={(e) => setOrganizationName(e.target.value)}
+                      placeholder="Nombre del despacho"
+                      autoComplete="organization"
+                      disabled={isLoading}
+                      className="w-full px-4 py-3 rounded-xl bg-white/5 border border-brand-primary/45 text-white text-sm placeholder:text-white/35 outline-none transition focus:border-brand-primary focus:bg-white/10 focus:shadow-[0_0_0_3px_rgba(59,79,232,0.18)] disabled:opacity-50"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="signup-name"
+                      className="block text-[11px] font-semibold tracking-widest text-white/70 uppercase mb-2"
+                    >
+                      Nombre
+                    </label>
+                    <input
+                      id="signup-name"
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Nombre del administrador"
+                      autoComplete="name"
+                      disabled={isLoading}
+                      className="w-full px-4 py-3 rounded-xl bg-white/5 border border-brand-primary/45 text-white text-sm placeholder:text-white/35 outline-none transition focus:border-brand-primary focus:bg-white/10 focus:shadow-[0_0_0_3px_rgba(59,79,232,0.18)] disabled:opacity-50"
+                    />
+                  </div>
+                </>
+              )}
               <div>
                 <label
                   htmlFor="login-email"
                   className="block text-[11px] font-semibold tracking-widest text-white/70 uppercase mb-2"
                 >
-                  Usuario
+                  {mode === 'signup' ? 'Correo' : 'Usuario'}
                 </label>
                 <div className="relative">
                   <input
                     id="login-email"
-                    type="text"
+                    type={mode === 'signup' ? 'email' : 'text'}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="correo@despacho.mx"
-                    autoComplete="username"
+                    autoComplete={mode === 'signup' ? 'email' : 'username'}
                     disabled={isLoading}
                     className="w-full pl-4 pr-11 py-3 rounded-xl bg-white/5 border border-brand-primary/45 text-white text-sm placeholder:text-white/35 outline-none transition focus:border-brand-primary focus:bg-white/10 focus:shadow-[0_0_0_3px_rgba(59,79,232,0.18)] disabled:opacity-50"
                   />
@@ -221,7 +307,7 @@ export default function LoginView() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    autoComplete="current-password"
+                    autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                     disabled={isLoading}
                     className="w-full pl-4 pr-11 py-3 rounded-xl bg-white/5 border border-brand-primary/45 text-white text-sm placeholder:text-white/35 outline-none transition focus:border-brand-primary focus:bg-white/10 focus:shadow-[0_0_0_3px_rgba(59,79,232,0.18)] disabled:opacity-50"
                   />
@@ -241,8 +327,17 @@ export default function LoginView() {
                   CON <span className="text-[#818CF8]">COLLECTA</span>
                 </h1>
                 <p className="mt-4 text-sm text-white/60 leading-relaxed">
-                  Inicia sesión para gestionar<br />
-                  inteligentemente y escalar tus resultados.
+                  {mode === 'signup' ? (
+                    <>
+                      Crea el tenant de tu despacho<br />
+                      y entra como administrador.
+                    </>
+                  ) : (
+                    <>
+                      Inicia sesión para gestionar<br />
+                      inteligentemente y escalar tus resultados.
+                    </>
+                  )}
                 </p>
               </div>
 
@@ -265,7 +360,7 @@ export default function LoginView() {
                 disabled={isLoading}
                 className="w-full py-3 rounded-xl bg-brand-primary hover:bg-[#3142C7] text-white text-sm font-semibold tracking-wide transition shadow-lg shadow-[rgba(59,79,232,0.28)] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? 'Verificando...' : 'Ingresar'}
+                {isLoading ? (mode === 'signup' ? 'Creando...' : 'Verificando...') : (mode === 'signup' ? 'Crear cuenta y entrar' : 'Ingresar')}
               </button>
 
               <LoginProviderPanel

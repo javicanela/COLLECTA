@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { commitSmartImportRows } from './commit';
 
 describe('smartImport commit service', () => {
-  it('calls the supplied batch processor with adapted legacy rows', async () => {
+  it('calls the supplied batch processor with adapted legacy rows scoped to the organization', async () => {
     const processor = vi.fn().mockResolvedValue({
       clientesCreados: 1,
       clientesActualizados: 0,
@@ -21,17 +21,17 @@ describe('smartImport commit service', () => {
           warnings: [],
         },
       ],
-    }, processor);
+    }, processor, 'org-smart-import');
 
     expect(processor).toHaveBeenCalledWith([
-      {
+      expect.objectContaining({
         rfc: 'ABC010101ABC',
         nombre: 'Cliente Uno',
         monto: 1250,
         concepto: 'FISCAL',
         fechaVence: '2026-04-15',
-      },
-    ]);
+      }),
+    ], 'org-smart-import');
     expect(result.success).toBe(true);
     expect(result.legacyRows).toHaveLength(1);
     expect(result.operacionesCreadas).toBe(1);

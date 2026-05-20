@@ -1,6 +1,6 @@
 # Free platform options
 
-Revision: 2026-05-13. Los precios y limites cambian; confirmar en la pagina
+Revision: 2026-05-20. Los precios y limites cambian; confirmar en la pagina
 oficial antes de tomar decisiones de produccion.
 
 ## Regla Collecta
@@ -22,41 +22,51 @@ oficial antes de tomar decisiones de produccion.
   deploy/promote/rollback.
 - Fallback local: `cd frontend; npm run dev`.
 
-## Railway backend
+## Render backend puente
 
-- Uso sugerido: backend Express cuando se autorice deploy externo.
-- Disponibilidad gratis: Railway documenta trial para nuevos usuarios y creditos
-  mensuales limitados en plan Free. Fuente:
-  <https://docs.railway.com/pricing/free-trial>.
-- Cuenta requerida: Railway; la verificacion puede depender de la cuenta GitHub.
+- Uso sugerido: backend Express cuando se autorice deploy externo y Railway no
+  este disponible.
+- Disponibilidad gratis: Render mantiene web services gratis para preview,
+  pero advierte que las instancias gratis no deben usarse para produccion y se
+  duermen tras inactividad. Fuente: <https://render.com/docs/free>.
+- Cuenta requerida: Render; la verificacion puede depender de la cuenta GitHub.
 - Datos enviados: codigo backend, logs, variables de entorno, trafico API.
 - Requiere confirmacion: login, crear servicio, crear DB, editar env vars,
   deploy/promote/rollback.
 - Fallback local: `cd backend; npm run dev` o `.\scripts\collecta-dev.ps1`.
 
-## Neon PostgreSQL
+## Railway backend
 
-- Uso sugerido: PostgreSQL oficial para produccion o staging.
-- Disponibilidad gratis: Neon mantiene plan Free sin tarjeta para aprender y
-  prototipar, con limites de proyectos, compute y storage. Fuente:
-  <https://neon.com/pricing>.
-- Cuenta requerida: Neon.
-- Datos enviados: datos de aplicacion almacenados en Postgres.
-- Requiere confirmacion: crear proyecto, copiar connection string, cargar env en
-  Railway/backend, importar datos.
-- Fallback local: `docker-compose.test.yml` o Postgres local.
+- Uso sugerido: fallback si el usuario decide reactivar o pagar Railway.
+- Estado actual: el trial de la cuenta mostrada por el usuario esta vencido y
+  los deploys estan pausados; no usar como default vigente.
+- Datos enviados: codigo backend, logs, variables de entorno, trafico API.
+- Requiere confirmacion: upgrade/login, crear servicio, editar env vars,
+  deploy/promote/rollback.
+- Fallback local: `cd backend; npm run dev` o `.\scripts\collecta-dev.ps1`.
 
-## Supabase
+## Supabase PostgreSQL y Storage
 
-- Uso sugerido: opcion alternativa para Postgres/Auth/Storage si el plan de
-  producto lo requiere.
+- Uso sugerido: PostgreSQL oficial para produccion o staging, bucket privado
+  para PDFs/adjuntos temporales y Auth opcional.
 - Disponibilidad gratis: Supabase mantiene plan Free; el plan Pro es pago.
   Fuente: <https://supabase.com/pricing>.
 - Cuenta requerida: Supabase.
-- Datos enviados: datos de DB, auth/storage si se habilitan.
-- Requiere confirmacion: crear proyecto, habilitar auth/storage, mover datos,
-  configurar secrets.
-- Fallback local: Postgres local + backend Express actual.
+- Datos enviados: datos de aplicacion almacenados en Postgres.
+- Requiere confirmacion: crear proyecto, copiar connection string, cargar env en
+  backend, crear bucket `statement-pdfs`, importar datos.
+- Fallback local: `docker-compose.test.yml` o Postgres local.
+
+## Neon PostgreSQL
+
+- Uso sugerido: fallback de DB si Supabase bloquea la cuenta, region o cuotas.
+- Disponibilidad gratis: confirmar en la pagina oficial antes de crear recursos.
+  Fuente: <https://neon.com/pricing>.
+- Cuenta requerida: Neon.
+- Datos enviados: datos de aplicacion almacenados en Postgres.
+- Requiere confirmacion: crear proyecto, copiar connection string, cargar env en
+  backend, importar datos.
+- Fallback local: `docker-compose.test.yml` o Postgres local.
 
 ## Firebase
 

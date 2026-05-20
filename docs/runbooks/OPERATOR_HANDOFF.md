@@ -68,7 +68,7 @@ payloads privados.
 
 ## Flujos a verificar
 
-- Importacion: `/registros`, cargar archivo demo no sensible, revisar mapping y
+- Importacion: `/registros`, cargar archivo de prueba no sensible, revisar mapping y
   preview antes de confirmar.
 - Cobranza: `/`, seleccionar operacion, revisar prioridad, estado y acciones.
 - Pagos: `/pagos/revision`, revisar candidatos, evidencia y confianza.

@@ -22,7 +22,7 @@ no credenciales operativas.
 - URLs locales como `http://localhost:3001/api`.
 - Credenciales de test obvias como `collecta:collecta` en
   `docker-compose.test.yml`.
-- Datos demo artificiales sin relacion con clientes reales.
+- Datos de prueba artificiales sin relacion con clientes reales.
 
 ## Politica de `.env`
 

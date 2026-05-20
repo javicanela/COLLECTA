@@ -19,9 +19,9 @@ const operation: Operation = {
   client: {
     id: 'client-1',
     rfc: 'AAA010101AAA',
-    nombre: 'Cliente Demo',
+    nombre: 'Cliente Prueba',
     telefono: null,
-    email: 'demo@example.com',
+    email: 'prueba@collecta.test',
     asesor: 'Ana',
     estado: 'ACTIVO',
   },
@@ -53,7 +53,7 @@ describe('OperationInspector', () => {
       />,
     );
 
-    expect(html).toContain('Cliente Demo');
+    expect(html).toContain('Cliente Prueba');
     expect(html).toContain('Atencion inmediata');
     expect(html).toContain('Saldo del cliente');
     expect(html).toContain('$1,700.00');
@@ -71,4 +71,3 @@ describe('OperationInspector', () => {
     expect(html).toBe('');
   });
 });
-
