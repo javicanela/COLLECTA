@@ -15,4 +15,17 @@ describe('StatusRail', () => {
 
     expect(html).toContain('Collecta Offline');
   });
+
+  it('allows horizontal scrolling on narrow viewports', () => {
+    const html = renderToStaticMarkup(
+      <StatusRail
+        sysMode="PRUEBA"
+        waStatus="not_configured"
+        activeProvider="gemini"
+        connectionStatus="online"
+      />,
+    );
+
+    expect(html).toContain('overflow-x-auto');
+  });
 });

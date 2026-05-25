@@ -19,6 +19,7 @@ import webhookRoutes from './routes/webhooks';
 import agentRoutes from './routes/agent';
 import diagnosticsRoutes from './routes/diagnostics';
 import { requireAuth } from './middleware/auth';
+import { configureTrustProxy } from './lib/trustProxy';
 
 dotenv.config();
 
@@ -26,6 +27,12 @@ const app = express();
 
 const PORT = process.env.PORT || 3001;
 const isProduction = process.env.NODE_ENV === 'production';
+
+configureTrustProxy(app, {
+  isProduction,
+  trustProxyEnv: process.env.TRUST_PROXY,
+  renderEnv: process.env.RENDER,
+});
 
 // Security middleware - MUST be first
 app.use(helmet());

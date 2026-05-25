@@ -27,23 +27,31 @@ const OPERATION_TERMS = [
   'fechalimite', 'concepto', 'descripcion', 'servicio', 'tipo', 'estatus',
 ];
 
-const FIELD_ALIASES: Record<string, { reasonKey: string; aliases: string[] }> = {
-  'client.rfc': { reasonKey: 'rfc', aliases: ['rfc', 'rfccliente', 'clavefiscal'] },
+type DetectorReason = 'rfc' | 'email' | 'phone' | 'money' | 'date' | 'sat' | 'boolean' | 'longText';
+
+interface AliasConfig {
+  reasonKey: string;
+  aliases: string[];
+  valueReason?: DetectorReason;
+}
+
+const FIELD_ALIASES: Record<string, AliasConfig> = {
+  'client.rfc': { reasonKey: 'rfc', aliases: ['rfc', 'rfccliente', 'clavefiscal'], valueReason: 'rfc' },
   'client.nombre': { reasonKey: 'nombre', aliases: ['nombre', 'nombrecliente', 'razonsocial', 'cliente', 'contribuyente', 'empresa'] },
-  'client.telefono': { reasonKey: 'telefono', aliases: ['telefono', 'celular', 'whatsapp', 'movil', 'contacto'] },
-  'client.email': { reasonKey: 'email', aliases: ['email', 'correo', 'correoelectronico', 'mail'] },
-  'client.regimen': { reasonKey: 'regimen', aliases: ['regimen', 'regimenfiscal', 'tiporegimen'] },
+  'client.telefono': { reasonKey: 'telefono', aliases: ['telefono', 'celular', 'whatsapp', 'movil', 'contacto'], valueReason: 'phone' },
+  'client.email': { reasonKey: 'email', aliases: ['email', 'correo', 'correoelectronico', 'mail'], valueReason: 'email' },
+  'client.regimen': { reasonKey: 'regimen', aliases: ['regimen', 'regimenfiscal', 'tiporegimen'], valueReason: 'sat' },
   'client.categoria': { reasonKey: 'categoria', aliases: ['categoria', 'clasificacion', 'segmento'] },
   'client.asesor': { reasonKey: 'asesor', aliases: ['asesorcliente', 'responsablecliente'] },
   'operation.tipo': { reasonKey: 'tipo', aliases: ['tipo', 'tipooperacion', 'operaciontipo', 'concepto', 'servicio'] },
-  'operation.descripcion': { reasonKey: 'descripcion', aliases: ['descripcion', 'descripcionoperacion', 'detalle', 'detalleservicio', 'concepto', 'servicio'] },
-  'operation.monto': { reasonKey: 'monto', aliases: ['monto', 'importe', 'adeudo', 'saldo', 'total', 'honorarios', 'cuota'] },
-  'operation.fechaVence': { reasonKey: 'fechaVence', aliases: ['fechavence', 'fechavencimiento', 'vencimiento', 'fechalimite', 'limitepago'] },
-  'operation.fechaPago': { reasonKey: 'fechaPago', aliases: ['fechapago', 'pagadoel', 'fechacobro'] },
+  'operation.descripcion': { reasonKey: 'descripcion', aliases: ['descripcion', 'descripcionoperacion', 'detalle', 'detalleservicio', 'concepto', 'servicio'], valueReason: 'longText' },
+  'operation.monto': { reasonKey: 'monto', aliases: ['monto', 'importe', 'adeudo', 'saldo', 'total', 'honorarios', 'cuota'], valueReason: 'money' },
+  'operation.fechaVence': { reasonKey: 'fechaVence', aliases: ['fechavence', 'fechavencimiento', 'vencimiento', 'fechalimite', 'limitepago'], valueReason: 'date' },
+  'operation.fechaPago': { reasonKey: 'fechaPago', aliases: ['fechapago', 'pagadoel', 'fechacobro'], valueReason: 'date' },
   'operation.estatus': { reasonKey: 'estatus', aliases: ['estatus', 'status', 'estadopago', 'situacion'] },
   'operation.asesor': { reasonKey: 'asesor', aliases: ['asesor', 'responsable', 'contador', 'ejecutivo'] },
-  'operation.excluir': { reasonKey: 'excluir', aliases: ['excluir', 'omitir', 'ignorar'] },
-  'operation.archived': { reasonKey: 'archived', aliases: ['archived', 'archivado', 'archivo'] },
+  'operation.excluir': { reasonKey: 'excluir', aliases: ['excluir', 'omitir', 'ignorar'], valueReason: 'boolean' },
+  'operation.archived': { reasonKey: 'archived', aliases: ['archived', 'archivado', 'archivo'], valueReason: 'boolean' },
 };
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -159,6 +167,23 @@ interface ColumnProfile {
   reasonCodes: string[];
 }
 
+interface ChallengeRegionSummary {
+  regionId: string;
+  confidence: number;
+  mappedFieldCount: number;
+  assumptionCount: number;
+  reasonCodes: string[];
+}
+
+interface RegionBundle {
+  sheet: WorkbookSheetSample;
+  region: DetectedRegion;
+  columns: ColumnProfile[];
+  mappings: MappingCandidate[];
+  confidence: number;
+  summary: ChallengeRegionSummary;
+}
+
 function profileColumns(rows: SmartImportCell[][], region: DetectedRegion): ColumnProfile[] {
   const dataRows = rows.slice(region.dataStartRow, region.endRow + 1);
   return region.headerLabels.map((sourceHeader, offset) => {
@@ -205,6 +230,30 @@ function scoreHeader(field: CanonicalField, normalizedHeader: string): { score: 
   return { score: 0, reasonCodes: [] };
 }
 
+function detectorScore(profile: ColumnProfile, field: CanonicalField): { score: number; reasonCodes: string[] } {
+  const config = FIELD_ALIASES[field];
+  if (!config?.valueReason) return { score: 0, reasonCodes: [] };
+
+  const detector = profile.detectors[config.valueReason];
+  if (!detector || detector.ratio < 0.34) return { score: 0, reasonCodes: [] };
+
+  const scoreMap: Record<DetectorReason, number> = {
+    rfc: 0.42,
+    email: 0.4,
+    phone: 0.36,
+    money: 0.38,
+    date: 0.34,
+    sat: 0.3,
+    boolean: 0.28,
+    longText: 0.3,
+  };
+
+  return {
+    score: scoreMap[config.valueReason] * detector.ratio,
+    reasonCodes: [`values:${config.valueReason === 'longText' ? 'long_text' : config.valueReason}`],
+  };
+}
+
 function scoreMappings(profiles: ColumnProfile[]): MappingCandidate[] {
   const canonicalFields = Object.keys(FIELD_ALIASES) as CanonicalField[];
 
@@ -212,26 +261,21 @@ function scoreMappings(profiles: ColumnProfile[]): MappingCandidate[] {
     const candidates: MappingCandidate[] = [];
     for (const field of canonicalFields) {
       const header = scoreHeader(field, profile.normalizedHeader);
-      const config = FIELD_ALIASES[field];
-
-      let valueScore = 0;
-      let valueReasons: string[] = [];
-      if (config?.aliases.length > 0) {
-        for (const valueKey of ['rfc', 'email', 'phone', 'money', 'date', 'sat', 'boolean'] as const) {
-          const detector = profile.detectors[valueKey];
-          if (detector && detector.ratio >= 0.34) {
-            const scoreMap: Record<string, number> = { rfc: 0.42, email: 0.4, phone: 0.36, money: 0.38, date: 0.34, sat: 0.3, boolean: 0.28 };
-            valueScore = Math.max(valueScore, scoreMap[valueKey] * detector.ratio);
-            valueReasons.push(`values:${valueKey}`);
-          }
-        }
-      }
-
-      const reasonCodes = [...header.reasonCodes, ...valueReasons];
-      let confidence = header.score + valueScore;
+      const value = detectorScore(profile, field);
+      const assumptions: string[] = [];
+      const reasonCodes = [...header.reasonCodes, ...value.reasonCodes];
+      let confidence = header.score + value.score;
 
       if (field === 'operation.descripcion' && profile.detectors.longText?.ratio >= 0.5) confidence += 0.12;
-      if (field === 'operation.tipo' && profile.detectors.longText?.ratio >= 0.5) { confidence -= 0.08; reasonCodes.push('values:long_text'); }
+      if (field === 'client.nombre' && profile.detectors.longText?.ratio >= 0.5 && profile.detectors.rfc?.ratio === 0) {
+        confidence += 0.08;
+        reasonCodes.push('values:name_like_text');
+      }
+      if (field === 'operation.tipo' && profile.detectors.longText?.ratio >= 0.5) {
+        confidence -= 0.08;
+        reasonCodes.push('values:long_text');
+        assumptions.push('Long descriptions may not be operation type values');
+      }
       if (confidence <= 0.18) continue;
 
       candidates.push({
@@ -240,41 +284,92 @@ function scoreMappings(profiles: ColumnProfile[]): MappingCandidate[] {
         field,
         confidence: Math.max(0.01, Math.min(0.99, Number(confidence.toFixed(3)))),
         reasonCodes: [...new Set(reasonCodes)],
+        assumptions,
+        alternatives: [],
       });
     }
     return candidates.sort((a, b) => b.confidence - a.confidence);
   }
 
   return profiles.map(profile => {
-    const scored = buildCandidates(profile);
-    if (scored.length === 0) {
-      return { columnIndex: profile.columnIndex, sourceHeader: profile.sourceHeader, field: 'ignore' as CanonicalField, confidence: 0.35, reasonCodes: ['mapping:no_signal'] };
+    const [best, ...alternatives] = buildCandidates(profile);
+    if (!best) {
+      return {
+        columnIndex: profile.columnIndex,
+        sourceHeader: profile.sourceHeader,
+        field: 'ignore' as CanonicalField,
+        confidence: 0.35,
+        reasonCodes: ['mapping:no_signal'],
+        assumptions: ['No reliable canonical field detected'],
+        alternatives: [],
+      };
     }
-    return scored[0];
+    return {
+      ...best,
+      alternatives: alternatives.slice(0, 3).map(alternative => ({
+        field: alternative.field,
+        confidence: alternative.confidence,
+        reasonCodes: alternative.reasonCodes,
+      })),
+    };
   });
 }
 
 // ── Challenge ─────────────────────────────────────────────────
 
 function runChallenge(
-  initialBundle: { regionId: string; confidence: number; mappedFieldCount: number; reasonCodes: string[] },
-  alternativeBundles: Array<{ regionId: string; confidence: number; mappedFieldCount: number; reasonCodes: string[] }>,
+  initialBundle: ChallengeRegionSummary,
+  alternativeBundles: ChallengeRegionSummary[],
+  mappings: MappingCandidate[],
 ) {
   const bestAlt = alternativeBundles.sort((a, b) => b.confidence - a.confidence)[0];
   let selectedRegionId = initialBundle.regionId;
+  let selectedConfidence = initialBundle.confidence;
   let status: 'confirmed' | 'changed' | 'downgraded' = 'confirmed';
   const findings: string[] = [];
   const warnings: string[] = [];
 
-  if (bestAlt && bestAlt.confidence >= initialBundle.confidence + 0.08 && bestAlt.mappedFieldCount >= initialBundle.mappedFieldCount) {
+  if (
+    bestAlt &&
+    bestAlt.confidence >= initialBundle.confidence + 0.08 &&
+    bestAlt.mappedFieldCount >= initialBundle.mappedFieldCount &&
+    bestAlt.assumptionCount <= initialBundle.assumptionCount
+  ) {
     status = 'changed';
     selectedRegionId = bestAlt.regionId;
+    selectedConfidence = bestAlt.confidence;
     findings.push('challenge:alternative_region_stronger');
+  }
+
+  for (const mapping of mappings) {
+    const descriptionAlternative = mapping.alternatives?.find(alternative => alternative.field === 'operation.descripcion');
+    const hasTipoDescriptionConflict =
+      mapping.field === 'operation.tipo' &&
+      descriptionAlternative &&
+      Math.abs(mapping.confidence - descriptionAlternative.confidence) <= 0.15 &&
+      mapping.reasonCodes.includes('values:long_text');
+
+    if (hasTipoDescriptionConflict) {
+      warnings.push('conflict:tipo_vs_descripcion');
+      findings.push('challenge:mapping_conflict_detected');
+    }
+  }
+
+  if (warnings.length > 0 && status === 'confirmed') {
+    status = 'downgraded';
+    selectedConfidence = Math.max(0, selectedConfidence - 0.08);
   }
 
   if (findings.length === 0) findings.push('challenge:initial_region_confirmed');
 
-  return { status, initialRegionId: initialBundle.regionId, selectedRegionId, confidenceDelta: 0, findings, warnings };
+  return {
+    status,
+    initialRegionId: initialBundle.regionId,
+    selectedRegionId,
+    confidenceDelta: Number((selectedConfidence - initialBundle.confidence).toFixed(3)),
+    findings,
+    warnings,
+  };
 }
 
 // ── Canonical row builder ────────────────────────────────────
@@ -295,28 +390,75 @@ function setCanonicalValue(row: CanonicalImportRow, field: CanonicalField, value
   else (row.operation as any)[property] = raw as never;
 }
 
-function buildCanonicalRows(sheet: WorkbookSheetSample, region: DetectedRegion, mappings: MappingCandidate[]): CanonicalImportRow[] {
+function buildCanonicalRows(
+  sheet: WorkbookSheetSample,
+  region: DetectedRegion,
+  mappings: MappingCandidate[],
+  inputSource: SmartImportAnalyzeInput['source'],
+): CanonicalImportRow[] {
   const active = mappings.filter(m => m.field !== 'ignore' && m.confidence >= 0.38);
   const rows: CanonicalImportRow[] = [];
   for (let sri = region.dataStartRow; sri <= region.endRow; sri++) {
     const sourceRow = sheet.rows[sri] || [];
-    const row: CanonicalImportRow = { rowNumber: sri + 1, sourceRowIndex: sri, client: {}, operation: {}, warnings: [] };
+    const row: CanonicalImportRow = {
+      rowNumber: sri + 1,
+      sourceRowIndex: sri,
+      source: {
+        fileName: inputSource.fileName,
+        sheetName: sheet.name,
+        regionId: region.regionId,
+        extractor: 'backend-deterministic',
+      },
+      client: {},
+      operation: {},
+      warnings: [],
+    };
     for (const mapping of active) setCanonicalValue(row, mapping.field, sourceRow[mapping.columnIndex]);
-    if (!row.client.telefono) row.warnings.push('row:telefono_missing');
-    if (!row.client.email) row.warnings.push('row:email_missing');
+    if (row.client.rfc || row.client.nombre) {
+      if (!row.client.telefono) row.warnings.push('row:telefono_missing');
+      if (!row.client.email) row.warnings.push('row:email_missing');
+    }
     if (Object.keys(row.client).length > 0 || Object.keys(row.operation).length > 0) rows.push(row);
   }
   return rows;
 }
 
+function createRegionBundle(sheet: WorkbookSheetSample, region: DetectedRegion): RegionBundle {
+  const columns = profileColumns(sheet.rows, region);
+  const mappings = scoreMappings(columns);
+  const mappedCandidates = mappings.filter(mapping => mapping.field !== 'ignore' && mapping.confidence >= 0.42);
+  const averageMappingConfidence = mappedCandidates.length > 0
+    ? mappedCandidates.reduce((sum, mapping) => sum + mapping.confidence, 0) / mappedCandidates.length
+    : 0;
+  const assumptionCount = mappings.reduce((sum, mapping) => (
+    sum + (mapping.assumptions?.length || 0) + (mapping.confidence < 0.65 ? 1 : 0)
+  ), 0);
+  const confidence = Math.min(0.99, Number(((region.confidence * 0.5) + (averageMappingConfidence * 0.5)).toFixed(3)));
+
+  return {
+    sheet,
+    region,
+    columns,
+    mappings,
+    confidence,
+    summary: {
+      regionId: region.regionId,
+      confidence,
+      mappedFieldCount: mappedCandidates.length,
+      assumptionCount,
+      reasonCodes: region.reasonCodes,
+    },
+  };
+}
+
 // ── Main entry ───────────────────────────────────────────────
 
 export function analyzeSmartImportSamples(input: SmartImportAnalyzeInput): SmartImportAnalyzeResult {
-  const sheetRegions = input.sheets.flatMap(sheet =>
-    detectTableRegions(sheet.sheetId, sheet.rows).map(region => ({ sheet, region }))
+  const regionBundles = input.sheets.flatMap(sheet =>
+    detectTableRegions(sheet.sheetId, sheet.rows).map(region => createRegionBundle(sheet, region))
   );
 
-  if (sheetRegions.length === 0) {
+  if (regionBundles.length === 0) {
     // Fallback: use old method
     const firstSheet = input.sheets[0];
     const region: DetectedRegion = {
@@ -331,28 +473,20 @@ export function analyzeSmartImportSamples(input: SmartImportAnalyzeInput): Smart
     return buildResult(firstSheet, region, input);
   }
 
-  const initialBundle = sheetRegions.sort((a, b) => b.region.confidence - a.region.confidence)[0];
-  const profileBundle = {
-    regionId: initialBundle.region.regionId,
-    confidence: initialBundle.region.confidence,
-    mappedFieldCount: initialBundle.region.headerLabels.length,
-    reasonCodes: initialBundle.region.reasonCodes,
-  };
-  const altBundles = sheetRegions.filter(r => r.region.regionId !== initialBundle.region.regionId).map(r => ({
-    regionId: r.region.regionId,
-    confidence: r.region.confidence,
-    mappedFieldCount: r.region.headerLabels.length,
-    reasonCodes: r.region.reasonCodes,
-  }));
-  const challengeResult = runChallenge(profileBundle, altBundles);
+  const initialBundle = [...regionBundles]
+    .sort((a, b) => b.region.confidence - a.region.confidence || a.region.startRow - b.region.startRow)[0];
+  const rankedBundles = [...regionBundles].sort((a, b) => b.confidence - a.confidence || b.summary.mappedFieldCount - a.summary.mappedFieldCount);
+  const challengeResult = runChallenge(
+    initialBundle.summary,
+    rankedBundles.filter(bundle => bundle.region.regionId !== initialBundle.region.regionId).map(bundle => bundle.summary),
+    initialBundle.mappings,
+  );
 
   const selected = challengeResult.status === 'changed'
-    ? sheetRegions.find(r => r.region.regionId === challengeResult.selectedRegionId) || initialBundle
+    ? rankedBundles.find(r => r.region.regionId === challengeResult.selectedRegionId) || initialBundle
     : initialBundle;
 
-  const columns = profileColumns(selected.sheet.rows, selected.region);
-  const mappings = scoreMappings(columns);
-  const previewCanonicalRows = buildCanonicalRows(selected.sheet, selected.region, mappings);
+  const previewCanonicalRows = buildCanonicalRows(selected.sheet, selected.region, selected.mappings, input.source);
   const warnings = [...challengeResult.warnings];
   if (previewCanonicalRows.length === 0) warnings.push('analysis:no_canonical_rows');
 
@@ -361,12 +495,12 @@ export function analyzeSmartImportSamples(input: SmartImportAnalyzeInput): Smart
     source: input.source,
     selectedSheet: { sheetId: selected.sheet.sheetId, name: selected.sheet.name },
     selectedRegion: selected.region,
-    detectedRegions: sheetRegions.map(r => r.region),
+    detectedRegions: rankedBundles.map(r => r.region),
     providerUsed: 'deterministic',
     providersAttempted: ['deterministic'],
-    challengeResult: { ...challengeResult, status: 'confirmed' },
-    confidence: selected.region.confidence,
-    mappings,
+    challengeResult,
+    confidence: selected.confidence,
+    mappings: selected.mappings,
     warnings,
     previewCanonicalRows,
     legacyRows: adaptCanonicalRowsToImportRows(previewCanonicalRows),
@@ -376,7 +510,7 @@ export function analyzeSmartImportSamples(input: SmartImportAnalyzeInput): Smart
 function buildResult(sheet: WorkbookSheetSample, region: DetectedRegion, input: SmartImportAnalyzeInput): SmartImportAnalyzeResult {
   const columns = profileColumns(sheet.rows, region);
   const mappings = scoreMappings(columns);
-  const previewCanonicalRows = buildCanonicalRows(sheet, region, mappings);
+  const previewCanonicalRows = buildCanonicalRows(sheet, region, mappings, input.source);
   return {
     analysisId: `sia_${crypto.randomUUID()}`,
     source: input.source,

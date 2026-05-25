@@ -16,6 +16,9 @@ interface SupabaseJwtPayload extends jwt.JwtPayload {
   app_metadata?: {
     role?: string;
     collecta_role?: string;
+    organizationId?: string;
+    organization_id?: string;
+    collecta_organization_id?: string;
   };
 }
 
@@ -53,6 +56,17 @@ function providerRoleFromPayload(payload: SupabaseJwtPayload) {
   return role === 'admin' || role === 'service' ? 'asesor' : role;
 }
 
+function organizationIdFromPayload(payload: SupabaseJwtPayload): string | undefined {
+  const raw =
+    payload.app_metadata?.collecta_organization_id ||
+    payload.app_metadata?.organizationId ||
+    payload.app_metadata?.organization_id;
+  const organizationId = raw?.trim();
+  if (!organizationId) return undefined;
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(organizationId)) return undefined;
+  return organizationId;
+}
+
 export async function verifyProviderToken(token: string): Promise<AuthenticatedPrincipal | null> {
   const secret = envValue('SUPABASE_JWT_SECRET');
   if (!secret) return null;
@@ -60,12 +74,15 @@ export async function verifyProviderToken(token: string): Promise<AuthenticatedP
   try {
     const decoded = jwt.verify(token, secret) as SupabaseJwtPayload;
     if (!decoded.sub) return null;
+    const organizationId = organizationIdFromPayload(decoded);
+    if (!organizationId) return null;
 
     return {
       userId: decoded.sub,
       email: decoded.email,
       role: providerRoleFromPayload(decoded),
       authSource: 'supabase',
+      organizationId,
     };
   } catch {
     return null;

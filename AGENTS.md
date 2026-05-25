@@ -79,6 +79,25 @@ mas reciente:
 - Crear commit con el estado consolidado y hacer push de la rama vigente.
 - Solo despues continuar con la siguiente fase de implementacion.
 
+## Orquestacion paralela de CLIs
+
+Los bloques de desarrollo no triviales deben trabajarse con CLIs/agentes
+paralelos cuando esten disponibles, usando scopes limpios para acelerar sin
+pisar cambios:
+
+- El coordinador primero revisa rama, worktree, estado Git y objetivo del
+  bloque.
+- Cada CLI recibe un contrato con ownership disjunto de archivos o subsistema,
+  criterios de exito, comandos de verificacion y prohibicion de `git add`,
+  `commit` o `push`.
+- Los cambios utiles se integran en la rama final solo si se alinean con la
+  version SaaS real de Collecta y pasan verificacion fresca.
+- OpenCode u otro CLI inestable se trata como reemplazable; si falla por
+  autenticacion, permisos o tooling, se instala o usa un suplente sin bloquear
+  el avance.
+- Codex conserva la responsabilidad de revisar diffs, resolver conflictos,
+  ejecutar pruebas completas aplicables y hacer el commit/push final.
+
 ## Flujo permanente de actualizaciones
 
 - La prioridad actual es construir la primera version operable publica.

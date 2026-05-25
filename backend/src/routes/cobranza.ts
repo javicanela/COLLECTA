@@ -67,7 +67,11 @@ router.get('/cliente/:rfc/pdf', async (req: Request, res: Response) => {
     doc.end();
   } catch (error) {
     console.error('Error generating PDF:', error);
-    res.status(500).json({ error: 'Error generating PDF', details: (error as Error).message });
+    const isProduction = process.env.NODE_ENV === 'production';
+    res.status(500).json({
+      error: 'Error generating PDF',
+      ...(isProduction ? {} : { details: (error as Error).message }),
+    });
   }
 });
 

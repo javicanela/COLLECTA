@@ -87,11 +87,17 @@ function AppRoutes() {
 }
 
 function App() {
-  const { isAuthenticated, isLoading, checkAuth } = useAuthStore();
+  const { isAuthenticated, isLoading, checkAuth, logout } = useAuthStore();
 
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  useEffect(() => {
+    const handleSessionExpired = () => logout();
+    window.addEventListener('collecta:session-expired', handleSessionExpired);
+    return () => window.removeEventListener('collecta:session-expired', handleSessionExpired);
+  }, [logout]);
 
   return (
     <ErrorBoundary>

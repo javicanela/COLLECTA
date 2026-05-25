@@ -86,7 +86,10 @@ describe('Auth middleware', () => {
       {
         sub: 'supabase-user-001',
         email: 'asesor@despacho.mx',
-        app_metadata: { collecta_role: 'admin' },
+        app_metadata: {
+          collecta_role: 'admin',
+          collecta_organization_id: 'org-supabase-001',
+        },
       },
       process.env.SUPABASE_JWT_SECRET,
       { expiresIn: '1h' },
@@ -102,6 +105,7 @@ describe('Auth middleware', () => {
       email: 'asesor@despacho.mx',
       role: 'asesor',
       authSource: 'supabase',
+      organizationId: 'org-supabase-001',
     });
   });
 
@@ -111,6 +115,7 @@ describe('Auth middleware', () => {
       {
         sub: 'supabase-user-002',
         email: 'editable@despacho.mx',
+        app_metadata: { collecta_organization_id: 'org-supabase-002' },
         user_metadata: { collecta_role: 'admin' },
       },
       process.env.SUPABASE_JWT_SECRET,
@@ -127,7 +132,27 @@ describe('Auth middleware', () => {
       email: 'editable@despacho.mx',
       role: 'asesor',
       authSource: 'supabase',
+      organizationId: 'org-supabase-002',
     });
+  });
+
+  it('rejects provider JWTs without tenant metadata instead of falling back to default', async () => {
+    process.env.SUPABASE_JWT_SECRET = 'supabase_test_secret_12345678901234567890';
+    const token = jwt.sign(
+      {
+        sub: 'supabase-user-no-org',
+        email: 'no-org@despacho.mx',
+      },
+      process.env.SUPABASE_JWT_SECRET,
+      { expiresIn: '1h' },
+    );
+
+    const res = await req
+      .post('/api/auth/verify')
+      .set({ Authorization: `Bearer ${token}` });
+
+    expect(res.status).toBe(401);
+    expect(JSON.stringify(res.body)).not.toContain('default');
   });
 
   it('protects all client endpoints', async () => {

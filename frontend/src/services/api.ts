@@ -15,6 +15,19 @@ function getAuthToken(): string | null {
   }
 }
 
+function clearAuthToken(): void {
+  try {
+    localStorage.removeItem('collecta-token');
+  } catch {
+    // ignore storage failures in private mode
+  }
+}
+
+function notifySessionExpired(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('collecta:session-expired'));
+}
+
 /**
  * Wrapper genérico para fetch con manejo de errores mejorado
  */
@@ -60,6 +73,10 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
       errorBody = JSON.parse(rawResponse);
     } catch {
       // ignore parse errors; we'll fall back to status
+    }
+    if (response.status === 401 && token) {
+      clearAuthToken();
+      notifySessionExpired();
     }
     throw new Error(errorBody.message || errorBody.error || `Error en la petición: ${response.status}`);
   }

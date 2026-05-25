@@ -8,11 +8,18 @@ interface AuthStore {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  authError: string | null;
   login: (email: string, password: string) => Promise<boolean>;
   signup: (input: { organizationName: string; name: string; email: string; password: string }) => Promise<boolean>;
   logout: () => void;
   checkAuth: () => Promise<void>;
+  clearAuthError: () => void;
   updateUser: (user: Partial<User>) => void;
+}
+
+function getAuthErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message.trim()) return err.message;
+  return fallback;
 }
 
 function getStoredToken(): string | null {
@@ -37,30 +44,37 @@ export const useAuthStore = create<AuthStore>()((set) => ({
   token: initialToken,
   isAuthenticated: false,
   isLoading: !!initialToken,
+  authError: null,
 
   login: async (email: string, password: string) => {
-    set({ isLoading: true });
+    set({ isLoading: true, authError: null });
     try {
       const result = await authService.login(email, password);
       setStoredToken(result.token);
-      set({ user: result.user, token: result.token, isAuthenticated: true, isLoading: false });
+      set({ user: result.user, token: result.token, isAuthenticated: true, isLoading: false, authError: null });
       return true;
     } catch (err) {
-      set({ isLoading: false });
+      set({
+        isLoading: false,
+        authError: getAuthErrorMessage(err, 'Credenciales inválidas. Intenta de nuevo.'),
+      });
       console.error('Login failed:', err);
       return false;
     }
   },
 
   signup: async (input) => {
-    set({ isLoading: true });
+    set({ isLoading: true, authError: null });
     try {
       const result = await authService.signup(input);
       setStoredToken(result.token);
-      set({ user: result.user, token: result.token, isAuthenticated: true, isLoading: false });
+      set({ user: result.user, token: result.token, isAuthenticated: true, isLoading: false, authError: null });
       return true;
     } catch (err) {
-      set({ isLoading: false });
+      set({
+        isLoading: false,
+        authError: getAuthErrorMessage(err, 'No pudimos crear la cuenta. Revisa los datos e intenta de nuevo.'),
+      });
       console.error('Signup failed:', err);
       return false;
     }
@@ -69,11 +83,13 @@ export const useAuthStore = create<AuthStore>()((set) => ({
   logout: () => {
     clearStoredToken();
     void signOutExternalAuth();
-    set({ user: null, token: null, isAuthenticated: false });
+    set({ user: null, token: null, isAuthenticated: false, authError: null });
   },
 
+  clearAuthError: () => set({ authError: null }),
+
   checkAuth: async () => {
-    set({ isLoading: true });
+    set({ isLoading: true, authError: null });
     let token = getStoredToken();
     if (!token) {
       token = await getExternalAuthAccessToken();

@@ -60,7 +60,7 @@ function SidebarNav({ currentPath, isMobile, vencidasCount, onNavigate }: Sideba
                     to={item.path}
                     onClick={isMobile ? onNavigate : undefined}
                     className={`
-                      group flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium
+                      group relative flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium
                       no-underline transition-colors
                       ${active
                         ? 'bg-[var(--sidebar-active-bg)] text-[var(--sidebar-text-active)]'
@@ -188,6 +188,11 @@ export default function MainLayout() {
   useEffect(() => {
     fetchOperations();
   }, [fetchOperations]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- close mobile drawer after route change
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!isBrowserOnline) {

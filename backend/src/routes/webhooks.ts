@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { normalizePhone } from '../services/evolutionApi';
@@ -11,6 +12,17 @@ const WEBHOOK_SECRET = process.env.EVOLUTION_WEBHOOK_SECRET || '';
 const WEBHOOK_ORGANIZATION_ID = process.env.EVOLUTION_WEBHOOK_ORGANIZATION_ID || '';
 const PAYMENT_DETECTION_WEBHOOK_URL = process.env.PAYMENT_DETECTION_WEBHOOK_URL || '';
 const PAYMENT_DETECTION_WEBHOOK_TOKEN = process.env.PAYMENT_DETECTION_WEBHOOK_TOKEN || '';
+
+// Constant-time comparison to avoid leaking the secret via response timing.
+// Mirrors the timingSafeEqual helper used in middleware/auth.ts.
+function timingSafeEqualStr(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
 let warnedEmptySecret = false;
 function verifyWebhookSecret(req: Request, res: Response, next: import('express').NextFunction) {
@@ -26,8 +38,9 @@ function verifyWebhookSecret(req: Request, res: Response, next: import('express'
     next();
     return;
   }
-  const secret = req.headers['x-webhook-secret'];
-  if (secret !== WEBHOOK_SECRET) {
+  const headerValue = req.headers['x-webhook-secret'];
+  const provided = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+  if (!provided || !timingSafeEqualStr(provided, WEBHOOK_SECRET)) {
     res.status(403).json({ error: 'Invalid webhook secret' });
     return;
   }
@@ -207,7 +220,13 @@ router.post('/evolution', verifyWebhookSecret, async (req: Request, res: Respons
         : null,
     });
   } catch (error: any) {
-    res.status(500).json({ error: 'Error processing webhook', details: error.message });
+    // Don't leak internal error details (DB errors, stack hints) in production.
+    // Consistent with the error policy in index.ts.
+    const isProduction = process.env.NODE_ENV === 'production';
+    res.status(500).json({
+      error: 'Error processing webhook',
+      ...(isProduction ? {} : { details: error?.message }),
+    });
   }
 });
 

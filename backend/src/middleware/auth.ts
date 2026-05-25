@@ -131,6 +131,10 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   const providerPrincipal = await verifyProviderToken(token);
   if (providerPrincipal) {
+    if (!providerPrincipal.organizationId) {
+      res.status(401).json({ error: 'Provider token missing organization scope' });
+      return;
+    }
     req.user = providerPrincipal;
     next();
     return;

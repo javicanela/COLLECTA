@@ -31,6 +31,28 @@ describe('api browser authentication', () => {
     }));
   });
 
+  it('clears the stored session and notifies the app when the API returns 401', async () => {
+    const removeItem = vi.fn();
+    const dispatchEvent = vi.fn();
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn(() => 'expired-token'),
+      removeItem,
+    });
+    vi.stubGlobal('window', {
+      dispatchEvent,
+    });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'Token expirado' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    })));
+
+    const { api } = await import('./api');
+
+    await expect(api.get('/protected')).rejects.toThrow('Token expirado');
+    expect(removeItem).toHaveBeenCalledWith('collecta-token');
+    expect(dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({ type: 'collecta:session-expired' }));
+  });
+
   it('does not fall back to the expired Railway backend in production builds', async () => {
     vi.resetModules();
     vi.unstubAllEnvs();

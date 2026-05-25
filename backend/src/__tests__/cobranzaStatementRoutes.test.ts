@@ -167,6 +167,24 @@ describe('GET /api/cobranza/cliente/:rfc/pdf', () => {
     expect(res.headers['content-type']).toContain('application/pdf');
     expect(generateEstadoCuenta).toHaveBeenCalledWith('XAXX010101000', 'org-pdf');
   });
+
+  it('does not expose PDF generation details in production errors', async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    vi.mocked(generateEstadoCuenta).mockRejectedValueOnce(new Error('DATABASE_URL=secret-value'));
+
+    try {
+      const res = await buildApp()
+        .get('/api/cobranza/cliente/XAXX010101000/pdf')
+        .set(authHeaderForOrg('org-pdf'));
+
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ error: 'Error generating PDF' });
+      expect(JSON.stringify(res.body)).not.toContain('DATABASE_URL');
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
+  });
 });
 
 describe('GET /api/cobranza/media/:token', () => {

@@ -9,48 +9,53 @@ export default function LoginView() {
   const login = useAuthStore((s) => s.login);
   const signup = useAuthStore((s) => s.signup);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const authError = useAuthStore((s) => s.authError);
+  const clearAuthError = useAuthStore((s) => s.clearAuthError);
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [organizationName, setOrganizationName] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [validationError, setValidationError] = useState('');
   const [providerStatus] = useState(() => getExternalAuthProviderStatus());
+  const displayError = validationError || authError || '';
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError('');
+    setValidationError('');
+    clearAuthError();
     if (mode === 'signup') {
       if (!organizationName || !name || !email || !password) {
-        setError('Completa los datos de tu despacho y administrador.');
+        setValidationError('Completa los datos de tu despacho y administrador.');
         return;
       }
       if (password.length < 12) {
-        setError('La contrasena debe tener al menos 12 caracteres.');
+        setValidationError('La contrasena debe tener al menos 12 caracteres.');
         return;
       }
-      const ok = await signup({ organizationName, name, email, password });
-      if (!ok) {
-        setError('No pudimos crear la cuenta. Revisa los datos e intenta de nuevo.');
-      }
+      await signup({ organizationName, name, email, password });
       return;
     }
     if (!email || !password) {
-      setError('Ingresa tu usuario y contraseña.');
+      setValidationError('Ingresa tu usuario y contraseña.');
       return;
     }
-    const ok = await login(email, password);
-    if (!ok) {
-      setError('Credenciales inválidas. Intenta de nuevo.');
-    }
+    await login(email, password);
   };
 
   const handleProviderLogin = async () => {
-    setError('');
+    setValidationError('');
+    clearAuthError();
     const result = await startSupabaseLogin();
     if (!result.ok) {
-      setError(result.error);
+      setValidationError(result.error);
     }
+  };
+
+  const switchMode = (nextMode: 'login' | 'signup') => {
+    setMode(nextMode);
+    setValidationError('');
+    clearAuthError();
   };
 
   return (
@@ -160,13 +165,13 @@ export default function LoginView() {
 
         <div className="mt-6 pt-4 border-t border-slate-200">
           <p className="text-xs text-slate-500">
-            Sistema de cobranza para despachos contables - Tijuana, BC.
+            SaaS de cobranza inteligente para despachos contables en Mexico.
           </p>
         </div>
       </aside>
 
       {/* ═══════════ RIGHT PANEL — Login ═══════════ */}
-      <section className="flex-1 relative flex flex-col items-center justify-center p-6 lg:p-10 overflow-hidden">
+      <section className="relative flex flex-1 flex-col items-center justify-center overflow-hidden p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6 lg:p-10">
         {/* Starfield background */}
         <StarfieldBg />
 
@@ -202,13 +207,35 @@ export default function LoginView() {
               </span>
             </div>
 
+            <div className="mb-5">
+              <h1
+                className="text-[26px] leading-[1.05] font-extrabold tracking-tight text-white sm:text-[30px] lg:text-[34px]"
+                style={{ fontFamily: "'Outfit', sans-serif" }}
+              >
+                DESBLOQUEA EL<br />
+                POTENCIAL DE<br />
+                TU DESPACHO<br />
+                CON <span className="text-[#818CF8]">COLLECTA</span>
+              </h1>
+              <p className="mt-3 text-sm leading-relaxed text-white/60">
+                {mode === 'signup' ? (
+                  <>
+                    Crea el tenant de tu despacho<br />
+                    y entra como administrador.
+                  </>
+                ) : (
+                  <>
+                    Inicia sesión para gestionar<br />
+                    inteligentemente y escalar tus resultados.
+                  </>
+                )}
+              </p>
+            </div>
+
             <div className="mb-6 grid grid-cols-2 gap-2 rounded-xl border border-white/10 bg-white/5 p-1">
               <button
                 type="button"
-                onClick={() => {
-                  setMode('login');
-                  setError('');
-                }}
+                onClick={() => switchMode('login')}
                 className={`rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wider transition ${
                   mode === 'login' ? 'bg-white text-[#11172f]' : 'text-white/60 hover:text-white'
                 }`}
@@ -217,10 +244,7 @@ export default function LoginView() {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setMode('signup');
-                  setError('');
-                }}
+                onClick={() => switchMode('signup')}
                 className={`rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wider transition ${
                   mode === 'signup' ? 'bg-white text-[#11172f]' : 'text-white/60 hover:text-white'
                 }`}
@@ -315,33 +339,7 @@ export default function LoginView() {
                 </div>
               </div>
 
-              {/* Headline */}
-              <div className="pt-4">
-                <h1
-                  className="text-[30px] lg:text-[34px] leading-[1.05] font-extrabold tracking-tight text-white"
-                  style={{ fontFamily: "'Outfit', sans-serif" }}
-                >
-                  DESBLOQUEA EL<br />
-                  POTENCIAL DE<br />
-                  TU DESPACHO<br />
-                  CON <span className="text-[#818CF8]">COLLECTA</span>
-                </h1>
-                <p className="mt-4 text-sm text-white/60 leading-relaxed">
-                  {mode === 'signup' ? (
-                    <>
-                      Crea el tenant de tu despacho<br />
-                      y entra como administrador.
-                    </>
-                  ) : (
-                    <>
-                      Inicia sesión para gestionar<br />
-                      inteligentemente y escalar tus resultados.
-                    </>
-                  )}
-                </p>
-              </div>
-
-              {error && (
+              {displayError && (
                 <div
                   role="alert"
                   className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-400/30 text-red-200 text-sm"
@@ -351,7 +349,7 @@ export default function LoginView() {
                     <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                     <circle cx="12" cy="16" r="1" fill="currentColor" />
                   </svg>
-                  <span>{error}</span>
+                  <span>{displayError}</span>
                 </div>
               )}
 

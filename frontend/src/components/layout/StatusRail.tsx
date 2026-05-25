@@ -75,7 +75,7 @@ export function StatusRail({
 
   return (
     <div
-      className={`flex flex-wrap items-center gap-3 rounded-md border border-[var(--c-border-subtle)] bg-[var(--c-surface)] px-3 py-2 text-xs ${className}`}
+      className={`flex max-w-full items-center gap-3 overflow-x-auto rounded-md border border-[var(--c-border-subtle)] bg-[var(--c-surface)] px-3 py-2 text-xs [-webkit-overflow-scrolling:touch] [scrollbar-width:thin] ${className}`}
     >
       <StatusBadge
         label={sysMode}

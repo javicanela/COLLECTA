@@ -119,6 +119,7 @@ describe('auth middleware principal contract', () => {
       email: 'asesor@despacho.mx',
       role: 'asesor',
       authSource: 'supabase',
+      organizationId: 'org-provider-001',
     });
 
     const res = await createProtectedApp()
@@ -132,7 +133,24 @@ describe('auth middleware principal contract', () => {
       email: 'asesor@despacho.mx',
       role: 'asesor',
       authSource: 'supabase',
+      organizationId: 'org-provider-001',
     });
+  });
+
+  it('rejects provider principals without organization scope', async () => {
+    verifyProviderTokenMock.mockResolvedValue({
+      userId: 'external-user-no-org',
+      email: 'asesor@despacho.mx',
+      role: 'asesor',
+      authSource: 'supabase',
+    });
+
+    const res = await createProtectedApp()
+      .get('/protected')
+      .set({ Authorization: 'Bearer provider-token-no-org' });
+
+    expect(res.status).toBe(401);
+    expect(res.body.error).toMatch(/organization/i);
   });
 
   it('rejects invalid bearer tokens without echoing token details', async () => {

@@ -284,7 +284,7 @@ router.post('/verify', verifyRateLimiter, async (req: Request, res: Response) =>
       userId: decoded.userId,
       email: decoded.email,
       role: normalizePrincipalRole(decoded.role, 'viewer'),
-      authSource: decoded.authSource === 'local' ? 'local' : 'local',
+      authSource: 'local',
       organizationId: decoded.organizationId,
     };
 
@@ -295,6 +295,10 @@ router.post('/verify', verifyRateLimiter, async (req: Request, res: Response) =>
   } catch {
     const providerPrincipal = await verifyProviderToken(token);
     if (providerPrincipal) {
+      if (!providerPrincipal.organizationId) {
+        res.status(401).json({ error: 'Provider token missing organization scope' });
+        return;
+      }
       res.json({
         valid: true,
         user: publicUser(providerPrincipal),
